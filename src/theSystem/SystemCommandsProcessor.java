@@ -21,10 +21,8 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	
 	private ArrayList<String> resultsList; //for printing results
 	private CommandManager commandManager = new CommandManager(); // for the processors
-	private DiskManager diskManager;
+	private DiskManager diskManager = new DiskManager();
 	boolean stopExecution; //shuts down program
-	DiskUnit currentDirectory;// mounted disk
-	String mountName; //name of mounted disk
 	SystemCommand attemptedSC; 
 
 	//NOTE: The HelpProcessor is inherited...
@@ -52,7 +50,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	 *  states the system can be in. 
 	 */
 	public SystemCommandsProcessor() {
-
+		
 		// stack of states
 		currentState = new IntStack(); 
 
@@ -112,7 +110,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 					result=Integer.toString(i+1)+") " + name + " -- Block Size:"
 							+ " ["+commandManager.getDiskBlockSize(name)+"] -- Capacity:"
 							+ " ["+commandManager.getDiskBlockAmount(name)+"] --";
-					if (mountName!=null && mountName.equals(name)){
+					if (diskManager.isMounted() && diskManager.getDiskName().equals(name)){
 						result = result+" [CURRENTLY MOUNTED]\n";
 					}else{
 						result = result+" [Not Mounted]\n";
@@ -143,21 +141,23 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			else if(commandManager.nameExists(diskName))	{													
 				resultsList.add("This disk already exists " + diskName);
 			}
-			else if(bsize<=32 || !((bsize&-bsize)==bsize)){
+			else if(bsize<32 || !((bsize&-bsize)==bsize)){
+				resultsList.add("Disk block size must be greater than 32 and a power of 2: " + bsize);
+			}
+			else if(numberOfBlocks<32 || !((numberOfBlocks&-numberOfBlocks)==numberOfBlocks)){
 				resultsList.add("Disk block size must be greater than 32 and a power of 2: " + bsize);
 			}
 			else {
 				DiskUnit.createDiskUnit(diskName, numberOfBlocks, bsize);
 				try {
-					diskManager=new DiskManager(diskName, true);
-				} catch (IOException e) {}
+					diskManager.prepareDiskUnit(diskName, false);
+				} catch (IOException e) {e.printStackTrace();}
 				commandManager.addNewDiskToManager(diskName);
 				resultsList.add("Disk created!");					 
 			}
 			return resultsList;
 		} 
 	}
-
 
 
 
@@ -171,7 +171,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			if (!OperandValidatorUtils.isValidName(diskName)){											
 				resultsList.add("Invalid name formation: " + diskName); 
 			}
-			else if (mountName!=null && mountName.equals(diskName)){											
+			else if (diskManager.isMounted() && diskManager.getDiskName().equals(diskName)){											
 				resultsList.add("Cannot delete a mounted disk: " + diskName); 
 			}
 			else if(!commandManager.nameExists(diskName))	{													
@@ -187,7 +187,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-
+//to check; what can we do while mounted?
 	private class mountProcessor implements CommandActionHandler{
 
 		@Override
@@ -199,11 +199,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("Invalid name formation: " + diskName);
 			}
 
-			else if (currentDirectory!=null){
-				if (mountName.equals(diskName)){
+			else if (diskManager.isMounted()){
+				if (diskManager.getDiskName().equals(diskName)){
 					resultsList.add("That disk is already mounted!");
 				}else{
-					resultsList.add("A disk is already mounted: "+mountName+"!");
+					resultsList.add("A disk is already mounted: "+diskManager.getDiskName()+"!");
 				}
 			}
 			else if(!(commandManager.nameExists(diskName))){
@@ -211,10 +211,9 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}
 			else{
 				try{
-					currentDirectory = DiskUnit.mount(diskName);
-					mountName = diskName;
-					resultsList.add(diskName+" is Mounted");
-				}catch(NonExistingDiskException e){
+					diskManager.prepareDiskUnit(diskName, true);
+					resultsList.add(diskName+" is Mounted.");
+				}catch(Exception e){
 					e.printStackTrace();
 				}
 			}
@@ -229,17 +228,15 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-
+//to fix
 	private class unmountProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
-			if(currentDirectory==null){
+			if(!diskManager.isMounted()){
 				resultsList.add("No disk is currently mounted.");
 			}
 			else {
-				currentDirectory.shutdown();
-				currentDirectory=null;
-				mountName=null;
+			//	diskManager.stop();
 				resultsList.add("Disk has been successfully unmounted disk");
 			}
 

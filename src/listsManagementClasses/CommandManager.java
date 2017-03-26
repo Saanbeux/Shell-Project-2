@@ -55,19 +55,16 @@ public class CommandManager {
 			size--;
 			diskNameList.seek(0);
 			names.remove(diskName);
-			RandomAccessFile temp = new RandomAccessFile("temp.txt","rw"); //creates new temp file to replace instead of rewrite.
+			diskNameList.close();
+			File file = new File("DiskNames.txt"); //for deleting old names
+			file.delete();
+			RandomAccessFile temp = new RandomAccessFile("DiskNames.txt","rw"); //creates file with new names.
 			for (String name : names){
 				temp.writeBytes(name+"\n");
 			}
-
-			temp.close();
-			File tempFile = new File("temp.txt"); //for using "renameTo", replacing the original DiskNames.txt
-			File file = new File("DiskNames.txt"); //only created for reference
+			diskNameList = temp;
 			File fileToDelete = new File(diskName); //created to actually delete the disk
-			
-			tempFile.renameTo(file); //Rewriting DiskNames.txt to temp.txt
 			fileToDelete.delete(); // deletes DiskUnit
-			tempFile.delete();//deleting temp.txt
 		}catch (Exception e){}
 	}
 
@@ -101,6 +98,6 @@ public class CommandManager {
 		return size;
 	}
 	public boolean isEmpty(){
-		return names.isEmpty();
+		return size==0;
 	}
 }

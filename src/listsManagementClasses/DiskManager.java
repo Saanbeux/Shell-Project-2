@@ -1,15 +1,20 @@
 package listsManagementClasses;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
+import diskUtilities.DiskUnit;
 import lists.INode;
 import lists.SLINodeList;
 
 public class DiskManager {
 	RandomAccessFile diskUnitRAF;
+	private DiskUnit currentDirectory;// mounted disk
+	private String mountName; //name of mounted disk
 	private int blockSize;
 	private int capacity;
+	
 	private int freeBlockIndex; //index where the free block tree root is located
 	private int endOfFreeBlockIndex; //last index in free block tree
 	private int firstFreeINode; // Next available I-Node
@@ -17,20 +22,34 @@ public class DiskManager {
 	private int iNodeBlockAmount;//how many blocks in total INodes will take up
 	private int iNodePerBlock; //how many INodes fit in a block
 	private int intsPerBlock; //how many separate numbers fit in a block
+	
 	private SLINodeList iNodeList; //Singly Linked List for the INodes
 
-	public DiskManager(String diskName, boolean recentlyCreated) throws IOException{
+	public DiskManager(){
+		currentDirectory = null;
+		mountName = null;
+	}
+
+
+
+	public void prepareDiskUnit(String diskName, boolean beingMounted) throws IOException{
 		//constants; will always be in the diskunit regardless if it was created recently.
 		diskUnitRAF = new RandomAccessFile(diskName,"rw");
 		capacity = diskUnitRAF.readInt();
 		blockSize = diskUnitRAF.readInt();
 		iNodeList = new SLINodeList(); //initialize linked list
-		intsPerBlock = blockSize/4;
+		intsPerBlock = blockSize/4; //Used for amount of free block indexes that can be stored within a single block;
 		totalINodes = ((blockSize*capacity)/900); //total I-Nodes is 1% of diskUnit size
 		iNodeBlockAmount = ((9*totalINodes)/blockSize); //how many blocks in total vINodes will take up
 		iNodePerBlock = blockSize/9;
 		
-		if(!recentlyCreated){ //Extract all the control information
+		
+		
+		
+		if(beingMounted){ //Extract all the control information
+			currentDirectory = DiskUnit.mount(diskName);
+			mountName = diskName;
+			
 			freeBlockIndex = diskUnitRAF.readInt();
 			endOfFreeBlockIndex = diskUnitRAF.readInt();
 			firstFreeINode = diskUnitRAF.readInt();
@@ -62,10 +81,6 @@ public class DiskManager {
 			diskUnitRAF.writeInt(totalINodes);
 		}
 	}
-
-
-
-
 
 
 
@@ -125,5 +140,19 @@ public class DiskManager {
 				iNodeList.addFirstNode(new INode(emptyInt,emptyInt,emptyByte));
 			}
 		}
+	}
+	
+	
+	public String getDiskName(){
+		return mountName;
+	}
+	public boolean isMounted(){
+		return currentDirectory!=null;
+	}
+	public void stop() throws IOException {
+		diskUnitRAF.close();
+		currentDirectory.shutdown();
+		currentDirectory=null;
+		mountName=null;
 	}
 }
