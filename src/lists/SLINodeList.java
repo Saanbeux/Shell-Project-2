@@ -201,8 +201,8 @@ public class SLINodeList {
 	 * The execution of this method removes all the data nodes
 	 * from the current instance of the list. 
 	 */
-	public void makeEmpty() { 
-		// TODO
+	public boolean isEmpty() { 
+		return length==0;
 	}
 		
 	protected void finalize() throws Throwable {

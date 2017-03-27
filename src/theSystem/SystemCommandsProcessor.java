@@ -259,7 +259,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 //				if (!diskManager.isMounted()){
 //					resultsList.add("No disk is currently mounted!");
 //				}else{
-//					if (diskManager.fileExists()){
+//					if (diskManager.fileExists(fileToBeRead)){
 //						
 //					}
 //				}

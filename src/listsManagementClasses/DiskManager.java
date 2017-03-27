@@ -11,7 +11,7 @@ import lists.SLINodeList;
 
 public class DiskManager {
 	RandomAccessFile diskUnitRAF;
-	private DiskUnit currentDirectory;// mounted disk
+	private int currentDirectory;
 	private String mountName; //name of mounted disk
 
 	private int blockSize;
@@ -27,10 +27,9 @@ public class DiskManager {
 
 	private int intsPerBlock; //how many separate numbers fit in a block
 
-	private SLINodeList iNodeList; //Singly Linked List for the INodes
+	private SLINodeList usedINodesList; //Singly Linked List for the INodes
 
 	public DiskManager(){
-		currentDirectory = null;
 		mountName = null;
 	}
 
@@ -39,9 +38,11 @@ public class DiskManager {
 	public void prepareDiskUnit(String diskName, boolean beingMounted) throws IOException{
 		//constants; will always be in the diskunit regardless if it was created recently.
 		diskUnitRAF = new RandomAccessFile(diskName,"rw");
+
 		capacity = diskUnitRAF.readInt();
 		blockSize = diskUnitRAF.readInt();
-		iNodeList = new SLINodeList(); //initialize linked list
+
+		usedINodesList = new SLINodeList(); //initialize linked list
 		intsPerBlock = blockSize/4; //Used for amount of free block indexes that can be stored within a single block;
 		totalINodes = calculateTotalINodes(); //total I-Nodes is 1% of diskUnit size
 		iNodeBlockAmount = ((9*totalINodes)/blockSize); //how many blocks in total vINodes will take up
@@ -49,26 +50,31 @@ public class DiskManager {
 
 
 		if(beingMounted){ //Extract all the control information
-			currentDirectory = DiskUnit.mount(diskName);
 			mountName = diskName;
+			currentDirectory = //root file of disk
 
-			freeBlockIndex = diskUnitRAF.readInt();
+					freeBlockIndex = diskUnitRAF.readInt();
 			endOfFreeBlockIndex = diskUnitRAF.readInt();
 			firstFreeINode = diskUnitRAF.readInt();
 			totalINodes = diskUnitRAF.readInt();
+
+
 			for (int x=1;x<=iNodeBlockAmount;x++){ // for each INode assigned block; starting at one to skip control block
 				diskUnitRAF.seek(x*blockSize); //seek the next INode block
-				for (int i=0;i<iNodePerBlock;i++){ //fit as many INodes into that block as possible
+				for (int i=0;i<iNodePerBlock;i++){ //for each I Node in block
 					byte type = diskUnitRAF.readByte();
 					int size = diskUnitRAF.readInt();
 					int fileIndex = diskUnitRAF.read();
-					iNodeList.addFirstNode(new INode(fileIndex,size,type)); //add iNode to list
+					if(type!=-1){
+						usedINodesList.addFirstNode(new INode(fileIndex,size,type)); //add iNode to list
+					}
 				}
 			}
 
 
 		}else{
 			//DiskUnit was recently created, RAF lacks required details in control other than Capacity and BlockSize.
+			currentDirectory = 0; //file not being mounted; just created
 			freeBlockIndex = iNodeBlockAmount+blockSize;//+1 to skip last INodesBlock index
 			endOfFreeBlockIndex = freeBlockIndex; //The block starts empty
 			firstFreeINode = blockSize+9; //First free INode in a formated disk is the first block after control, offsetting root I-Node.
@@ -83,10 +89,9 @@ public class DiskManager {
 			diskUnitRAF.writeInt(totalINodes);
 		}
 	}
+	/////////File Managers///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-
+	
 
 
 
@@ -152,12 +157,23 @@ public class DiskManager {
 			diskUnitRAF.seek(8); // write the new indexes for the free block manager and its current pointer.
 			diskUnitRAF.writeInt(freeBlockIndex);
 			diskUnitRAF.writeInt(endOfFreeBlockIndex);
-		} catch (IOException e) {} 
+		} catch (Exception e) {} 
 	}     
 
 
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//////INode Managers//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	private INode getINode(int index){
+		INode etr = usedINodesList.getFirstNode();
+		while (index>0){
+			etr = etr.getNext();
+			index--;
+		}
+		return etr;
+	}
+
+
+	//still worked on
 	public int getFreeINode() throws FullDiskException{ //returns index of an available I-Node
 		if (firstFreeINode==(iNodeBlockAmount+(iNodePerBlock*9))||totalINodes==1){ //i-Nodes are full; only root iNode available
 			throw new FullDiskException ("Disk does not have space for a new file!");
@@ -190,11 +206,11 @@ public class DiskManager {
 				diskUnitRAF.writeByte(emptyByte);//1 byte
 				diskUnitRAF.writeInt(emptyInt);//4 bytes
 				diskUnitRAF.writeInt(emptyInt); // 4 bytes; 9 bytes total
-				iNodeList.addFirstNode(new INode(emptyInt,emptyInt,emptyByte));
+				usedINodesList.addFirstNode(new INode(emptyInt,emptyInt,emptyByte));
 			}
 		}
 		diskUnitRAF.seek(blockSize+8); //Setting the root file; offsets control.
-		diskUnitRAF.writeInt(1); //Root i-Node is a directory.
+		diskUnitRAF.writeByte(1); //Root i-Node is a directory.
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,20 +225,28 @@ public class DiskManager {
 		return mountName;
 	}
 	public boolean isMounted(){
-		return currentDirectory!=null;
+		return mountName!=null;
 	}
 
 	public void stop() {
 		try {
 			diskUnitRAF.close(); //close this raf
+			formatINodeSpace(); //format all I-Nodes for restructuring
+			diskUnitRAF.seek(blockSize); //offset control
+			INode nta = usedINodesList.getFirstNode();
+			while(!usedINodesList.isEmpty()){
+				
+				
+			}
+			
+			
+			
+			for(int x=0; x<usedINodesList.length();x++){
+				
+			}
+			
+			
 		} catch (IOException e) {}
-		currentDirectory.shutdown(); //only useful if we're actually using diskunit methods
-		currentDirectory=null;
 		mountName=null;
-	}
-
-	public boolean fileExists() {
-		// TODO Auto-generated method stub
-		return false;
 	}
 }
