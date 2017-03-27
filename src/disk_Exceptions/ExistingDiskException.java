@@ -1,7 +1,7 @@
 package disk_Exceptions;
 /**
  * Exception when there is a Disk
- * @author Francisco Diaz
+ * @author Moises Garip
  *
  */
 //

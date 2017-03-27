@@ -58,11 +58,10 @@ public class CommandManager {
 			diskNameList.close();
 			File file = new File("DiskNames.txt"); //for deleting old names
 			file.delete();
-			RandomAccessFile temp = new RandomAccessFile("DiskNames.txt","rw"); //creates file with new names.
+			diskNameList = new RandomAccessFile("DiskNames.txt","rw"); //creates file with new names.
 			for (String name : names){
-				temp.writeBytes(name+"\n");
+				diskNameList.writeBytes(name+"\n");
 			}
-			diskNameList = temp;
 			File fileToDelete = new File(diskName); //created to actually delete the disk
 			fileToDelete.delete(); // deletes DiskUnit
 		}catch (Exception e){}

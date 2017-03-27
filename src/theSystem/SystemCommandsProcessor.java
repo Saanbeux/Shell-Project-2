@@ -236,10 +236,9 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("No disk is currently mounted.");
 			}
 			else {
-			//	diskManager.stop();
+				diskManager.stop();
 				resultsList.add("Disk has been successfully unmounted disk");
 			}
-
 			return resultsList;
 		}
 
@@ -257,8 +256,12 @@ public class SystemCommandsProcessor extends CommandProcessor {
 //				FixedLengthCommand fc = (FixedLengthCommand)c;
 //				String fileToBeOverwritten = fc.getOperand(1);
 //				String fileToBeRead = fc.getOperand(2);
-//				if (!commandManager.nameExists(fileToBeOverwritten)){
-//					
+//				if (!diskManager.isMounted()){
+//					resultsList.add("No disk is currently mounted!");
+//				}else{
+//					if (diskManager.fileExists()){
+//						
+//					}
 //				}
 //			}
 //	

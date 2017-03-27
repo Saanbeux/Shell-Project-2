@@ -1,7 +1,7 @@
 package disk_Exceptions;
 /**
  * Thrown when there is an invalid block in the Disk Unit
- * @author Francisco Diaz
+ * @author Moises Garip
  *
  */
 public class InvalidBlockException extends RuntimeException {

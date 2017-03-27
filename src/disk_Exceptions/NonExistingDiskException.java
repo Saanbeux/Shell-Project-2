@@ -1,7 +1,7 @@
 package disk_Exceptions;
 /**
  * Thrown whenever there is a Disk that does not exist in Disk Unit
- * @author Francisco Diaz
+ * @author Moises Garip
  *
  */
 public class NonExistingDiskException extends RuntimeException{

@@ -1,7 +1,7 @@
 package disk_Exceptions;
 /**
  * Thrown whenever there is an Invalid Parameter
- * @author Francisco Diaz
+ * @author Moises Garip
  *
  */
 public class InvalidParameterException extends RuntimeException {
