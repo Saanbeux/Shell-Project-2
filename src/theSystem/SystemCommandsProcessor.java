@@ -248,24 +248,27 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-//		private class loadFileProcessor implements CommandActionHandler{
-//	
-//			@Override
-//			public ArrayList<String> execute(Command c) {
-//				ArrayList<String> resultsList = new ArrayList<>();
-//				FixedLengthCommand fc = (FixedLengthCommand)c;
-//				String fileToBeOverwritten = fc.getOperand(1);
-//				String fileToBeRead = fc.getOperand(2);
-//				if (!diskManager.isMounted()){
-//					resultsList.add("No disk is currently mounted!");
-//				}else{
-//					if (diskManager.fileExists(fileToBeRead)){
-//						
-//					}
-//				}
-//			}
-//	
-//		}
+		private class loadFileProcessor implements CommandActionHandler{
+	
+			@Override
+			public ArrayList<String> execute(Command c) {
+				ArrayList<String> resultsList = new ArrayList<>();
+				FixedLengthCommand fc = (FixedLengthCommand)c;
+				String fileToBeOverwritten = fc.getOperand(1);
+				String fileToBeRead = fc.getOperand(2);
+				if (!diskManager.isMounted()){
+					resultsList.add("No disk is currently mounted!");
+				}else if (!diskManager.fileExists(fileToBeRead)){
+					resultsList.add("No such file name: "+fileToBeRead+"!");
+				}else if (diskManager.fileExists(fileToBeOverwritten)){//overwrite file
+					
+				}else{//create file
+					
+				}
+				return resultsList;
+			}
+	
+		}
 	
 	
 	

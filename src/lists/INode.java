@@ -8,17 +8,17 @@ public class INode{
 	public INode() { 
 		next = null; 
 	}
-	public INode(int index,int size,byte type, INode next) { 
+	public INode(byte type,int size,int index, INode next) { 
 		this.index = index; 
 		this.size = size;
 		this.type = type;
 		this.next = next; 
 	}
-	public INode(int index,int size,byte type)  { 
+	public INode(byte type,int size,int index)  { 
 		this.index = index; 
 		next = null; 
 	}
-	public int getElement() {
+	public int getIndex() {
 		return index;
 	}
 	public int getSize(){
@@ -35,5 +35,11 @@ public class INode{
 	}
 	public void setNext(INode next) {
 		this.next = next;
+	}
+	public void clean() {
+		index = (Integer) null; 
+		size = (Integer) null;
+		type = (Byte) null;
+		next = null; 
 	}
 }

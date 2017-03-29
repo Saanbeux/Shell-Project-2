@@ -22,6 +22,19 @@ public class SLINodeList {
 		head =nuevo; 
 		length++; 
 	}
+	public void addLast(INode nuevo) {
+		INode first = head;
+		if(length==0){
+			head=nuevo;
+			head.setNext(null);
+		}
+		while(first.getNext()!=null){
+			first = first.getNext();
+		}
+		first.setNext(nuevo); 
+		nuevo.setNext(null);
+		length++; 
+	}
 
 	public void addNodeAfter(INode target, INode nuevo) {
 		// Pre: target is a node in the list
