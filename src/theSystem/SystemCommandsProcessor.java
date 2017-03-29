@@ -18,7 +18,7 @@ import systemGeneralClasses.SystemCommand;
 
 
 public class SystemCommandsProcessor extends CommandProcessor { 
-	
+
 	private ArrayList<String> resultsList; //for printing results
 	private CommandManager commandManager = new CommandManager(); // for the processors
 	private DiskManager diskManager = new DiskManager();
@@ -50,7 +50,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	 *  states the system can be in. 
 	 */
 	public SystemCommandsProcessor() {
-		
+
 		// stack of states
 		currentState = new IntStack(); 
 
@@ -69,11 +69,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		// the following are just for demonstration...
 
 		/////////////////// commands/////////////////////////////////////
-		
-		
+
+
 		add(GENERALSTATE, SystemCommand.getFLSC("createdisk name int int", new createDiskProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("deletedisk name", new deleteDiskProcessor()));
-//		add(GENERALSTATE, SystemCommand.getFLSC("loadfile name name", new loadFileProcessor())); 
+		//		add(GENERALSTATE, SystemCommand.getFLSC("loadfile name name", new loadFileProcessor())); 
 		//add(GENERALSTATE, SystemCommand.getFLSC("cp name name", new cpProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("mount name", new mountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("unmount", new unmountProcessor())); 
@@ -82,8 +82,8 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		add(GENERALSTATE, SystemCommand.getFLSC("showdisks", new showdisksProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("help", new HelpProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("exit", new ShutDownProcessor()));
-		
-		
+
+
 		// need to follow this pattern to add a SystemCommand for each
 		// command that has been specified...
 		// ...
@@ -187,7 +187,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-//to check; what can we do while mounted?
+	//to check; what can we do while mounted?
 	private class mountProcessor implements CommandActionHandler{
 
 		@Override
@@ -228,7 +228,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-//to fix
+	//to fix
 	private class unmountProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
@@ -248,32 +248,32 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-		private class loadFileProcessor implements CommandActionHandler{
-	
-			@Override
-			public ArrayList<String> execute(Command c) {
-				ArrayList<String> resultsList = new ArrayList<>();
-				FixedLengthCommand fc = (FixedLengthCommand)c;
-				String fileToBeOverwritten = fc.getOperand(1);
-				String fileToBeRead = fc.getOperand(2);
-				if (!diskManager.isMounted()){
-					resultsList.add("No disk is currently mounted!");
-				}else if (!diskManager.fileExists(fileToBeRead)){
-					resultsList.add("No such file name: "+fileToBeRead+"!");
-				}else if (diskManager.fileExists(fileToBeOverwritten)){//overwrite file
-					
-				}else{//create file
-					
-				}
-				return resultsList;
+	private class loadFileProcessor implements CommandActionHandler{
+
+		@Override
+		public ArrayList<String> execute(Command c) {
+			ArrayList<String> resultsList = new ArrayList<>();
+			FixedLengthCommand fc = (FixedLengthCommand)c;
+			String fileToBeOverwritten = fc.getOperand(1);
+			String fileToBeRead = fc.getOperand(2);
+			if (!diskManager.isMounted()){
+				resultsList.add("No disk is currently mounted!");
+			}else if (!diskManager.fileExists(fileToBeRead)){
+				resultsList.add("No such file name: "+fileToBeRead+"!");
+			}else if (diskManager.fileExists(fileToBeOverwritten)){//overwrite file
+
+			}else{//create file
+
 			}
-	
+			return resultsList;
 		}
-	
-	
-	
-	
-	
+
+	}
+
+
+
+
+
 	private class cpProcessor implements CommandActionHandler{
 
 		@Override
@@ -335,24 +335,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	public boolean inShutdownMode() {
 		return stopExecution;
 	}
-
-	public ArrayList<String> recursivelyListFiles (File theFile){
-		ArrayList<String> files = new ArrayList<String>();
-		for(File tempFile : theFile.listFiles()){
-			if(!(tempFile.isDirectory())){
-				files.add(theFile.getName());
-
-			}
-			else{
-				files.add(tempFile.getName());
-				recursivelyListFiles(tempFile);
-			}
-
-		}
-		return files;
-
-	}
-
 }		
 
 

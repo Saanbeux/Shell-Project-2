@@ -21,6 +21,10 @@ public class DiskUnit {
 
 	private int capacity;         // number of blocks in current disk instance
 	private int blockSize;     // size of each block of current disk instance
+	private int freeBlockIndex;
+	private int endOfFreeBlockIndex;
+	private int firstFreeINode;
+	private int totalINodes;
 
 	// the file representing the simulated  disk, where all the disk blocks
 	// are stored
@@ -56,7 +60,7 @@ public class DiskUnit {
 	 * @param name the name of the disk unit to activate
 	 * @return the corresponding DiskUnit object
 	 * @throws NonExistingDiskException whenever no
-	 *    �disk� with the specified name is found.
+	 *    disk with the specified name is found.
 	 */
 	public static DiskUnit mount(String name)
 			throws NonExistingDiskException
@@ -72,6 +76,10 @@ public class DiskUnit {
 			dUnit.disk.seek(0);
 			dUnit.capacity = dUnit.disk.readInt();
 			dUnit.blockSize = dUnit.disk.readInt();
+			dUnit.freeBlockIndex = dUnit.disk.readInt();
+			dUnit.endOfFreeBlockIndex = dUnit.disk.readInt();
+			dUnit.firstFreeINode = dUnit.disk.readInt();
+			dUnit.totalINodes = dUnit.disk.readInt();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -162,6 +170,66 @@ public class DiskUnit {
 	public int getBlockSize(){
 		return blockSize;
 	}
+	/**
+	 * Returns the index of the current subtree that holds part of the free blocks.
+	 * @return freeBlockIndex
+	 */
+	public int getFreeBlockIndex(){
+		return freeBlockIndex;
+	}
+	/**
+	 * Returns the last child of the subtree that holds part o the free blocks. Returns
+	 * the subtree root if there are no other children.
+	 * @return endOfFreeBlockIndex
+	 */
+	public int getEndOfFreeBlockIndex(){
+		return endOfFreeBlockIndex;
+	}
+	/**
+	 * Returns the next available INode for managing files.
+	 * @return firstFreeINode
+	 */
+	public int getFirstFreeINode(){
+		return firstFreeINode;
+	}
+	/**
+	 * Returns the total amount of INodes available to the Disk Unit.
+	 * @return totalINodes
+	 */
+	public int getTotalINodes(){
+		return totalINodes;
+	}
+
+	public void setFreeBlockIndex(int freeBlockIndex){
+		try{
+			disk.seek(8);
+			disk.writeInt(freeBlockIndex);
+		}catch(IOException e){}
+		this.freeBlockIndex=freeBlockIndex;
+	}
+
+	public void setEndOfFreeBlockIndex(int endOfFreeBlockIndex){
+		try{
+			disk.seek(12);
+			disk.writeInt(endOfFreeBlockIndex);
+		}catch(IOException e){}
+		this.endOfFreeBlockIndex=endOfFreeBlockIndex;
+	}
+	public void setFirstFreeINode(int firstFreeINode){
+		try{
+			disk.seek(16);
+			disk.writeInt(firstFreeINode);
+		}catch(IOException e){}
+		this.firstFreeINode=firstFreeINode;
+	}
+	public void setTotalINodes(int totalINodes){
+		try{
+			disk.seek(20);
+			disk.writeInt(totalINodes);
+		}catch(IOException e){}
+		this.totalINodes=totalINodes;
+	}
+
 
 
 	private static void reserveDiskSpace(RandomAccessFile disk, int capacity,
@@ -179,6 +247,12 @@ public class DiskUnit {
 			disk.seek(0);
 			disk.writeInt(capacity);  
 			disk.writeInt(blockSize);
+			int totalINodeBlocks = (int)Math.ceil((double)capacity/100);
+			int freeBlocksIndex = totalINodeBlocks+1;//offsets control block 
+			disk.writeInt(freeBlocksIndex); //first free index is after i-node blocks. Those are the first 1%. Measured in indexes
+			disk.writeInt(0); //index is empty; the only one available is itself. Measured block indexes
+			disk.writeInt(blockSize+9); //first available i-Node is the one after root; offsetting control. Measured in bytes
+			disk.writeInt((capacity*blockSize)/900);//total iNodes available
 		} catch (IOException e) {
 			e.printStackTrace();
 		}     
@@ -193,22 +267,22 @@ public class DiskUnit {
 	 * @throws InvalidBlockException whenever the overwriting block is not of compatible size with the Disk Unit.
 	 */
 	public void write(int blockNum, VirtualDiskBlock b) throws InvalidBlockNumberException, InvalidBlockException{
-		if (blockNum<0||blockNum>=capacity){//Skips block 0; where the capacity and blockSize is held.
+		if (blockNum<=0||blockNum>=capacity){
 			throw new InvalidBlockNumberException("Block number is not a valid index: " + blockNum);
 		}
-		else if (b==null||b.getCapacity()!=blockSize){
+		else if (b.equals(null)||b.getCapacity()!=blockSize){
 			throw new InvalidBlockException("This block is not of compatible size with the disk unit!");
 		}else{
 			try {
-				disk.seek(blockSize*(blockNum+1));
+				disk.seek(blockSize*(blockNum));//Skips block 0; where the capacity and blockSize is held.
 				for (int x=0; x<b.getCapacity();x++){
-					disk.write(b.getElement(x));
-				}//write content of block onto index
+					disk.writeByte(b.getElement(x));
+				}
+
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-		return;
 	}
 
 	/**
@@ -222,19 +296,18 @@ public class DiskUnit {
 		if (blockNum<0||blockNum>=capacity){
 			throw new InvalidBlockNumberException("Block number not a valid index: " + blockNum);
 		}
-		else if (b==null || b.getCapacity()!=blockSize){
+		else if (b.getCapacity()!=blockSize){
 			throw new InvalidBlockException("This block is not of compatible size with Disk Unit!");
 		}else{
 			try {
 				disk.seek(blockSize*(blockNum+1)); //Starting from the 2nd block onward, block 1. Block 0 is reserved.
 				for (int x=0; x<b.getCapacity();x++){
-					b.setElement(x,disk.readByte());
-				} // write content of disk on to new block.
+					b.setElement(x, disk.readByte());
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-		return;
 	}
 	/**
 	 * Replaces all bytes within the Disk Unit with 0; excludes the reserved block where Capacity and Block Size are held.
