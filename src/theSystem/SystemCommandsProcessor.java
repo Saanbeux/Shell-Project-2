@@ -73,7 +73,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 		add(GENERALSTATE, SystemCommand.getFLSC("createdisk name int int", new createDiskProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("deletedisk name", new deleteDiskProcessor()));
-		//		add(GENERALSTATE, SystemCommand.getFLSC("loadfile name name", new loadFileProcessor())); 
+		add(GENERALSTATE, SystemCommand.getFLSC("loadfile name name", new loadFileProcessor())); 
 		//add(GENERALSTATE, SystemCommand.getFLSC("cp name name", new cpProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("mount name", new mountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("unmount", new unmountProcessor())); 
