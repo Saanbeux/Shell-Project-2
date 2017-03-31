@@ -149,9 +149,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}
 			else {
 				DiskUnit.createDiskUnit(diskName, numberOfBlocks, bsize);
-				try {
-					diskManager.prepareDiskUnit(diskName, false);
-				} catch (IOException e) {e.printStackTrace();}
+				diskManager.prepareDiskUnit(diskName);
 				commandManager.addNewDiskToManager(diskName);
 				resultsList.add("Disk created!");					 
 			}
@@ -211,7 +209,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}
 			else{
 				try{
-					diskManager.prepareDiskUnit(diskName, true);
+					diskManager.mount(diskName);
 					resultsList.add(diskName+" is Mounted.");
 				}catch(Exception e){
 					e.printStackTrace();
@@ -322,7 +320,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		public ArrayList<String> execute(Command c) { 
 
 			resultsList = new ArrayList<String>(); 
-			resultsList.add("SYSTEM IS SHUTTING DOWN!!!!");
+			resultsList.add("Thank you for using our prototype virtual disk operating system.");
 			stopExecution = true;
 			return resultsList; 
 		}

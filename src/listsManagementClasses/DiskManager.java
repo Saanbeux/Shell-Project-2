@@ -1,7 +1,5 @@
 package listsManagementClasses;
 
-import java.io.IOException;
-
 import diskUtilities.DiskUnit;
 import diskUtilities.DiskUtils;
 import diskUtilities.VirtualDiskBlock;
@@ -17,40 +15,30 @@ public class DiskManager {
 	private int iNodeBlockAmount;//how many blocks in total INodes will take up
 	private int iNodesPerBlock; //how many INodes fit in a block
 
-	public DiskManager(){
-		mountName = null;
-	}
+	public DiskManager(){}
 
-
-
-	public void prepareDiskUnit(String diskName, boolean beingMounted) throws IOException{
+	public void prepareDiskUnit(String diskName){ //prepares recently created DiskUnit
 		//constants; will always be in the diskunit regardless if it was created recently.
 		diskUnit = DiskUnit.mount(diskName);
-		iNodeBlockAmount = ((9*diskUnit.getTotalINodes())/diskUnit.getBlockSize()); //how many blocks in total INodes will take up
+		int blockSize = diskUnit.getBlockSize();
+		iNodeBlockAmount = ((9*diskUnit.getTotalINodes())/blockSize); //how many blocks in total INodes will take up
 		iNodesPerBlock = diskUnit.getBlockSize()/9;
-
-
-		if(beingMounted){ //Extract all the control information
-			currentDirectory = getINode(diskUnit.getBlockSize());//root file of disk
-			mountName = diskName;
-
-			//replace with get INodeAt
-		}else{
-			//DiskUnit was recently created, RAF lacks required details in control other than Capacity and BlockSize.
-			formatFreeBlockSpace();
-			formatINodeSpace();
-			int rootFileSize = diskUnit.getBlockSize()*8;
-			addINode(new INode((byte)0,rootFileSize,prepareFreeBlocksForUse(rootFileSize)));
-			VirtualDiskBlock test = new VirtualDiskBlock(diskUnit.getBlockSize());
-			diskUnit.read(1, test);
-			System.out.println(diskUnit.getFirstFreeINode());
-			currentDirectory = null; //file not being mounted; just created
-			diskUnit.shutdown();
-		}
+		formatFreeBlockSpace(); //prepare free blocks in DiskUnit
+		formatINodeSpace(); // prepare INodes in DiskUnit
+		int rootFileSize = blockSize*4; //test size for root file in directory
+		addINode(new INode((byte)0,rootFileSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
+		diskUnit.shutdown();//unmounts DiskUnit.
 	}
 
+	public void mount(String diskName){
+		diskUnit = DiskUnit.mount(diskName);
+		currentDirectory = getINode(0);
+		mountName = diskName;
+	}
 
-	public void formatINodeSpace(){
+	////////formatters////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	private void formatINodeSpace(){
 		int blockSize = diskUnit.getBlockSize();
 		int maxINodesPerBlock = blockSize/9;
 		int totalINodeBlocks = (int)Math.ceil((double)diskUnit.getCapacity()/100);
@@ -67,7 +55,7 @@ public class DiskManager {
 		}
 	}
 
-	public void formatFreeBlockSpace(){
+	private void formatFreeBlockSpace(){
 		int capacity = diskUnit.getCapacity();
 		int totalINodeBlocks = (int)Math.ceil((double)capacity/100);
 		int stillFreeSpace = capacity-totalINodeBlocks-1; //Amount of FreeBlocks left in an empty DiskUnit
@@ -189,7 +177,6 @@ public class DiskManager {
 
 	//////////free block managers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//should be good
 	public int getNextFreeBlock() throws FullDiskException{
 		int availableBlockIndex; 
 		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
@@ -210,8 +197,6 @@ public class DiskManager {
 	}
 
 
-
-	//should be good
 	public void registerFreeBlocks(int block) {//check if copy to block doesnt rewrite what was previously on
 		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
 		if (diskUnit.getFreeBlockIndex() == 0)  { //There were no free blocks previous to this
@@ -234,20 +219,22 @@ public class DiskManager {
 		}
 	}     
 
-
-	private int prepareFreeBlocksForUse(int fileSize) {//returns index of first block.
+	private int prepareFreeBlocksForUse(int fileSize) {//returns index of first block. Gets as many free blocks as the file needs and sets links up.
 		int blockSize = diskUnit.getBlockSize();
 		int totalBlocksUsed = (int)Math.ceil((double)fileSize/((double)blockSize-4.0));//formula used to determine how many blocks per file depending on file's size.
 		int currentBlock = 0;
+		int btr = 0;//for error
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		for(int x=0;x<totalBlocksUsed;x++){ // for each block needed, register a new free block.
 			int index = getNextFreeBlock();
-			diskUnit.read(index, vdb);
-			DiskUtils.copyIntToBlock(vdb, blockSize-4, currentBlock);
+			if (x==0){//save the first file's block
+				btr = index;
+			}
+			DiskUtils.copyIntToBlock(vdb, blockSize-4, currentBlock); //write previous block's reference into current node's last int
 			diskUnit.write(index, vdb);
 			currentBlock = index;
 		}
-		return currentBlock;
+		return btr;
 	}
 
 	//////INode Managers//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,10 +251,13 @@ public class DiskManager {
 		vdb.setElement(firstFreeINode, nta.getType());
 		DiskUtils.copyIntToBlock(vdb, firstFreeINode+1, nta.getSize());
 		DiskUtils.copyIntToBlock(vdb, firstFreeINode+5, nta.getIndex());
+		System.out.println(vdb.getElement(firstFreeINode));
+		System.out.println(DiskUtils.getIntFromBlock(vdb, firstFreeINode+1));
+		System.out.println(DiskUtils.getIntFromBlock(vdb, firstFreeINode+5));
 		diskUnit.write(blockCounter, vdb);
 		setNewFreeINode();
 	}
-	
+
 	private void setNewFreeINode(){
 		int blockCounter=1;
 		int remainingINodes = diskUnit.getTotalINodes();
