@@ -18,7 +18,7 @@ public class INode{
 	public byte getType(){
 		return type;
 	}
-	public void setElement(int index) {
+	public void setIndex(int index) {
 		this.index = index;
 	}
 	public void clean() {

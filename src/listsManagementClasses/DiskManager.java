@@ -119,11 +119,10 @@ public class DiskManager {
 						stringCounter++;
 					}
 				}
-				if (tempName.equals(fileName)){//file exists
+				if (tempName.equals(fileName)){//at file.
 					return true;
 				}
-				counter+=24;//advance to next file 
-
+				counter+=24;//advance to next file
 			}
 			currentIndex = DiskUtils.getIntFromBlock(vdb, blockSize-4); //get next block in file by reading end of block's int
 			if(currentIndex==0){ //if end int is 0, there are no more blocks in file.
@@ -133,6 +132,38 @@ public class DiskManager {
 		return false;
 	}
 
+//	public boolean loadFile(String fileName,String newName){
+//		boolean atEnd = false;
+//		int currentIndex = currentDirectory.getIndex();//start at current directory
+//		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+//		while (!atEnd){ // while still within directory
+//			diskUnit.read(currentIndex, vdb); //read current block in directory
+//			int counter=0; //counter for total bytes in blocks
+//			while(counter<blockSize){//there are still files in directory
+//				String tempName = ""; //empty string to concat chars.
+//				int stringCounter=0; //counter for current string
+//				while(stringCounter<20){
+//					if(DiskUtils.getCharFromBlock(vdb, counter)=='#'){//flag for end of name.
+//						break;//file name has been completely read
+//					}else{ //concat the char to tempName
+//						tempName = tempName+DiskUtils.getCharFromBlock(vdb, counter);
+//						stringCounter++;
+//					}
+//				}
+//				if (tempName.equals(fileName)){//at file.
+//					INode ntr = getINodeAtIndex(DiskUtils.getIntFromBlock(vdb, counter+19));
+//					copyFile(ntr,newName);
+//				}
+//				counter+=24;//advance to next file 
+//
+//			}
+//			currentIndex = DiskUtils.getIntFromBlock(vdb, blockSize-4); //get next block in file by reading end of block's int
+//			if(currentIndex==0){ //if end int is 0, there are no more blocks in file.
+//				atEnd=true;
+//			}
+//		}
+//		return false;
+//	}
 
 
 	//		public String getFileNameAtIndex(int index){//must advance pointer 44 bytes
@@ -304,7 +335,9 @@ public class DiskManager {
 		DiskUtils.copyIntToBlock(vdb, index+5,nta.getIndex()); //set new Index
 		diskUnit.write(blockPos, vdb);
 	}
-
+	private void addINode(INode nta) { //sets new iNode given a free i node index.
+		setINodeAtIndex(firstFreeINode,nta);
+	}
 
 
 
