@@ -1,5 +1,7 @@
 package listsManagementClasses;
 
+import java.awt.geom.Point2D;
+
 import diskUtilities.DiskUnit;
 import diskUtilities.DiskUtils;
 import diskUtilities.VirtualDiskBlock;
@@ -26,13 +28,13 @@ public class DiskManager {
 		formatFreeBlockSpace(); //prepare free blocks in DiskUnit
 		formatINodeSpace(); // prepare INodes in DiskUnit
 		int rootFileSize = blockSize*4; //test size for root file in directory
-		addINode(new INode((byte)0,rootFileSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
+		setINodeAtIndex(blockSize,new INode((byte)0,rootFileSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
 		diskUnit.shutdown();//unmounts DiskUnit.
 	}
 
 	public void mount(String diskName){
 		diskUnit = DiskUnit.mount(diskName);
-		currentDirectory = getINode(0);
+		currentDirectory = getINodeAtIndex(diskUnit.getBlockSize());
 		mountName = diskName;
 	}
 
@@ -47,19 +49,25 @@ public class DiskManager {
 		while (remainingINodes>0){
 			int maxINodesPerBlock = blockSize/9;
 			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-			while (maxINodesPerBlock>0){
+			while (maxINodesPerBlock>1){
 				DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode);
 				currentIndex+=9;
 				nextINode+=9;
 				maxINodesPerBlock--;
+				remainingINodes--;
 			}
 			remainingINodes--;
-			diskUnit.write(currentBlock, vdb);
+			if (remainingINodes==0){
+				return;
+			}
 			currentBlock++;
-			nextINode = (currentBlock*blockSize)+9;
+			nextINode = (currentBlock*blockSize);
+			DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode);
+			diskUnit.write(currentBlock, vdb);
 			currentIndex=5;
 		}
 	}
+
 
 	private void formatFreeBlockSpace(){
 		int capacity = diskUnit.getCapacity();
@@ -245,76 +253,37 @@ public class DiskManager {
 
 	//////INode Managers//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	private void addINode(INode nta){
-		int firstFreeINode=diskUnit.getFirstFreeINode();//this will be the INode to occupy
-		int blockCounter=1; //offset control
-		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
-		while(firstFreeINode>(iNodesPerBlock-1)){ //INode not in this block
-			blockCounter++; //store amount of blocks advanced
-			firstFreeINode-=iNodesPerBlock;//advance pointer to next block
-		}
-		diskUnit.read(blockCounter, vdb);//at block where free INode is located
-		vdb.setElement(firstFreeINode, nta.getType()); //set type
-		DiskUtils.copyIntToBlock(vdb, firstFreeINode+1, nta.getSize());//set size
-		DiskUtils.copyIntToBlock(vdb, firstFreeINode+5, nta.getIndex());//set index
-		System.out.println(vdb.getElement(firstFreeINode)+" is type");
-		System.out.println(DiskUtils.getIntFromBlock(vdb, firstFreeINode+1)+" is size");
-		System.out.println(DiskUtils.getIntFromBlock(vdb, firstFreeINode+5)+" is index");
-		diskUnit.write(blockCounter, vdb);
-		setNewFreeINode();
-	}
 
-	private void setNewFreeINode(){
-		int blockCounter=1;
-		int currentNumber=0;
-		int remainingINodes = diskUnit.getTotalINodes();
-		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
-		while(remainingINodes>0){ // while INodes remain
-			diskUnit.read(blockCounter, vdb); //go to current block
-			int currentINodeIndex=0; //start at beginning of block
-			while (currentINodeIndex<iNodesPerBlock){ //while there are INodes within block, read
-				if(vdb.getElement(currentINodeIndex)==-1){ //if the INode is free
-					diskUnit.setFirstFreeINode(currentNumber); //set the next free INode to be this one's position
-					return;
-				}
-				currentINodeIndex+=9;//advance to next INode in block
-				currentNumber++;//advance to next INode position
-				remainingINodes--;//one less INode to scan
-			}
-			blockCounter++;//no INodes were available in this block.
-		}
-		diskUnit.setFirstFreeINode(-1); //No INodes are available
-	}
-
-
-
-	private INode getINode(int iNodeNumber) { //returns iNode at this position
-		int remainingINodes = iNodeNumber;
-		int blockPos=1;//offsets control; index by block
-		while(remainingINodes>iNodesPerBlock){ //the i node isn't in this block
-			blockPos++; //go to the next block
-			remainingINodes=remainingINodes-iNodesPerBlock; //account for all nodes from previous block
-		}
+	private void reclaimINode(int iNodeIndex){//returns iNode to used linked list. 
+		int index =(int) getBlockIndexWithPosition(iNodeIndex).getY();
+		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
 		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
 		diskUnit.read(blockPos, vdb);
-		return new INode(vdb.getElement(remainingINodes),DiskUtils.getIntFromBlock(vdb, remainingINodes+1),DiskUtils.getIntFromBlock(vdb, remainingINodes+5));
+		int currentFreeINodeIndex = diskUnit.getFirstFreeINode();
+		DiskUtils.copyIntToBlock(vdb, index+5, currentFreeINodeIndex); //sets this iNode's next to the head
+		diskUnit.setFirstFreeINode(iNodeIndex); //this iNode is the new head.
 	}
 
+	private INode getINodeAtIndex(int iNodeIndex) { //returns iNode at this index.
+		int index =(int) getBlockIndexWithPosition(iNodeIndex).getY();
+		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
+		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
+		diskUnit.read(blockPos, vdb);
+		diskUnit.setFirstFreeINode(DiskUtils.getIntFromBlock(vdb, index+5));
+		return new INode(vdb.getElement(index),DiskUtils.getIntFromBlock(vdb, index+1),DiskUtils.getIntFromBlock(vdb, index+5));
+	}
+	private void setINodeAtIndex(int iNodeIndex, INode nta) { //sets new iNode given a free i node index.
+		int index =(int) getBlockIndexWithPosition(iNodeIndex).getY();
+		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
+		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
+		diskUnit.read(blockPos, vdb); //save previous information
+		diskUnit.setFirstFreeINode(DiskUtils.getIntFromBlock(vdb, index+5)); //set the new free iNode head using the "getNext()"
 
-
-
-//	private INode getINodeAtIndex(int iNodeIndex) { //returns index in block of INode in this position.
-//		int remainingINodes = iNodeIndex;
-//		int blockPos=1;//offsets control; index by block
-//		VirtualDiskBlock vdb = new VirtualDiskBlock(diskUnit.getBlockSize());
-//		while(remainingINodes>iNodesPerBlock*9){ //the i node isn't in this block
-//			blockPos+=1; //go to the next block
-//			remainingINodes-=iNodesPerBlock*9; //account for all nodes from previous block
-//		}
-//		diskUnit.read(blockPos, vdb);
-//		return new INode(vdb.getElement(remainingINodes),DiskUtils.getIntFromBlock(vdb, remainingINodes+1),DiskUtils.getIntFromBlock(vdb, remainingINodes+5));
-//	}
-
+		vdb.setElement(index,nta.getType()); //Set new type
+		DiskUtils.copyIntToBlock(vdb, index+1,nta.getSize()); //set new Size
+		DiskUtils.copyIntToBlock(vdb, index+5,nta.getIndex()); //set new Index
+		diskUnit.write(blockPos, vdb);
+	}
 
 
 
@@ -327,13 +296,16 @@ public class DiskManager {
 	public boolean isMounted(){
 		return mountName!=null;
 	}
-
+	
+	private Point2D getBlockIndexWithPosition(int totalByteIndex){//first is block index, second is index within that block's array.
+		int blockSize=diskUnit.getBlockSize();
+		int index = (totalByteIndex%blockSize);
+		return new Point2D.Double((int)Math.floor(index/blockSize),index);
+	}
+	
 	public void stop(){
 		mountName=null;
 		currentDirectory=null;
 	}
-
-
-
 
 }

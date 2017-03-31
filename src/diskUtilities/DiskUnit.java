@@ -193,7 +193,7 @@ public class DiskUnit {
 	}
 	/**
 	 * Returns the next available INode for managing files.
-	 * Measured in indexes from 0(root) to totalINodes-1().
+	 * Measured in bytes
 	 * @return firstFreeINode
 	 */
 	public int getFirstFreeINode(){
@@ -255,10 +255,10 @@ public class DiskUnit {
 			disk.seek(0);
 			disk.writeInt(capacity);  
 			disk.writeInt(blockSize);
-			disk.writeInt(0); //no registered blocks yet.
+			disk.writeInt(0); //no registered blocks yet. Measured in block positions
 			disk.writeInt(0); //index is empty; the only one available is itself. Measured block indexes, from 0 to blockSize
-			disk.writeInt(0); //first available i-Node; Measured in position of INode
-			if (((capacity*blockSize)/900)< blockSize/9){
+			disk.writeInt(0); //first available i-Node; Measured in bytes
+			if (((capacity*blockSize)/900)< blockSize/9){ //If the total amount is less than a block, fill that block. Making due with the space.
 				disk.writeInt(blockSize/9);//total iNodes available
 			}else{
 				disk.writeInt((capacity*blockSize)/900);//total iNodes available
