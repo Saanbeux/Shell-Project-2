@@ -185,7 +185,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-	//to check; what can we do while mounted?
 	private class mountProcessor implements CommandActionHandler{
 
 		@Override
@@ -222,11 +221,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 
 
-
-
-
-
-	//to fix
 	private class unmountProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
@@ -259,9 +253,9 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}else if (!diskManager.fileExists(fileToBeRead)){
 				resultsList.add("No such file name: "+fileToBeRead+"!");
 			}else if (diskManager.fileExists(fileToBeOverwritten)){//overwrite file
-
+				resultsList.add(fileToBeRead+" has been overwritten!");
 			}else{//create file
-
+				resultsList.add("No such file name: "+fileToBeOverwritten+"! File has been created instead.");
 			}
 			return resultsList;
 		}
