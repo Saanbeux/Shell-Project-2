@@ -253,17 +253,16 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
 				return resultsList;
 			}//The file must exist
-			if (!diskManager.fileExists(fileToBeRead)){ 
+			if (!diskManager.fileExistsInDirectory(fileToBeRead)){ 
 				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
 				return resultsList;
 			}//there must be space for the file.
-			int fileToBeReadIndex = diskManager.getFileIndex(fileToBeRead);
+			int fileToBeReadIndex = diskManager.getFileInDirectoryIndex(fileToBeRead);
 			if (!diskManager.isAvailableSpace(fileToBeReadIndex)){
 				resultsList.add("\n There is no more space left in disk! \n");
 			}//overwrite file
-			else if (diskManager.fileExists(fileToBeOverwritten)){
-				
-				
+			else if (diskManager.fileExistsInDirectory(fileToBeOverwritten)){
+				diskManager.loadFileInDirectory(fileToBeRead, fileToBeOverwritten);
 				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
 			}//create file
 			else{
