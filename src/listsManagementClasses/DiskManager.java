@@ -37,8 +37,10 @@ public class DiskManager {
 
 		formatFreeBlockSpace(); //prepare free blocks in DiskUnit
 		formatINodeSpace(); // prepare INodes in DiskUnit
-		int rootFileSize = blockSize*4; //test size for root file in directory
-		setINodeAtIndex(blockSize,new INode((byte)0,rootFileSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
+		int rootFileSize = blockSize; //test size for root file in directory
+		
+		//creates a root of size blockSize, sets the file's size to how many blocks it actually takes up.
+		addINode(new INode((byte)0,((int)Math.ceil((double)rootFileSize/((double)blockSize-4.0)))*blockSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
 		stop();
 		diskUnit.shutdown();
 	}
@@ -60,38 +62,37 @@ public class DiskManager {
 
 	////////formatters////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	private void formatINodeSpace(){
+	private void formatINodeSpace(){ //creates a stacked linked-list of iNodes. The last iNode will always point to 0.
 		int remainingINodes = totalINodes;
 		int nextINode = blockSize+9;
-		int currentBlock = 0;
-		int currentIndex = 5;
-		while (remainingINodes>0){
-			int maxINodesPerBlock = blockSize/9;
-			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-			while (maxINodesPerBlock>1){
-				DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode);
-				currentIndex+=9;
-				nextINode+=9;
-				maxINodesPerBlock--;
+		int currentBlock = 0; //start at first block
+		while (remainingINodes>0){ //while there are INodes left to register
+			int currentIndex = 5; //start at first INode in block's "fileIndex" property; resets counter.
+			int maxINodesPerBlock = blockSize/9; // reset counter
+			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize); 
+			while (maxINodesPerBlock>1){ // while there is still space in block
+				DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode); //write next available INode on to current iNode's fileINdex property.
+				currentIndex+=9; //advance to next index within block
+				nextINode+=9; //Advance to next INode to store
+				maxINodesPerBlock--; //counters are reduced
 				remainingINodes--;
-			}
+			}//The while loop stops at one to be able to account for missing space at end of block, last INode in block has to point at first INode in next block during a format.
 			remainingINodes--;
-			if (remainingINodes==0){
+			if (remainingINodes==0){//there are no more INodes; last iNode in block points to nothing.
 				return;
 			}
 			currentBlock++;
-			nextINode = (currentBlock*blockSize);
-			DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode);
+			nextINode = (currentBlock*blockSize); //get firstINode at next block.
+			DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode); //copy first INode of next block onto lastiNode of previous block.
 			diskUnit.write(currentBlock, vdb);
-			currentIndex=5;
 		}
 	}
 
 
-	private void formatFreeBlockSpace(){
+	private void formatFreeBlockSpace(){ //creates a tree of free blocks, where the root's parent is 0. 
 		int totalINodeBlocks = (int)Math.ceil((double)capacity/100);
-		int stillFreeSpace = capacity-totalINodeBlocks-1; //Amount of FreeBlocks left in an empty DiskUnit
-		int currentBlock = totalINodeBlocks+1; //block after iNodes
+		int stillFreeSpace = capacity-totalINodeBlocks; //Amount of FreeBlocks left in an empty DiskUnit
+		int currentBlock = totalINodeBlocks; //block after iNodes
 		while (stillFreeSpace>0){ //while there is still free space
 			registerFreeBlocks(currentBlock); //register the next block
 			currentBlock+=1; //go to the next block
@@ -101,26 +102,34 @@ public class DiskManager {
 
 
 	/////////File Managers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	public boolean fileExists(String fileName){
+	public boolean isAvailableSpace(int fileToBeReadIndex) {
+		if(!(firstFreeINode==0)){ //if 0; there are no INodes, no new file may be created.
+			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+			diskUnit.read((int)getBlockIndexWithPosition(fileToBeReadIndex).getX(), vdb);
+			int iNodeIndex = DiskUtils.getIntFromBlock(vdb, (int)getBlockIndexWithPosition(fileToBeReadIndex).getY()+20);//20 to offset characters, read next 4 bytes as int
+			//gets amount of blocks needed and compares to how many are available
+			return ((getINodeAtIndex(iNodeIndex)).getSize()/blockSize)<=totalFreeBlocks();
+		}
+		return false;
+	}
+	
+
+	public int getFileIndex(String fileName){
 		boolean atEnd = false;
 		int currentIndex = currentDirectory.getIndex();//start at current directory
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		while (!atEnd){ // while still within directory
 			diskUnit.read(currentIndex, vdb); //read current block in directory
 			int counter=0; //counter for total bytes in blocks
-			while(counter<blockSize){//there are still files in directory
+			while(counter<=blockSize){//there are still files in directory
 				String tempName = ""; //empty string to concat chars.
 				int stringCounter=0; //counter for current string
 				while(stringCounter<20){
-					if(DiskUtils.getCharFromBlock(vdb, counter)=='#'){//flag for end of name.
-						break;//file name has been completely read
-					}else{ //concat the char to tempName
 						tempName = tempName+DiskUtils.getCharFromBlock(vdb, counter);
 						stringCounter++;
 					}
-				}
 				if (tempName.equals(fileName)){//at file.
-					return true;
+					return (((currentIndex*blockSize)-blockSize)+counter);
 				}
 				counter+=24;//advance to next file
 			}
@@ -129,9 +138,20 @@ public class DiskManager {
 				atEnd=true;
 			}
 		}
-		return false;
+		vdb=null;
+		return -1;//file does not exist
+	}
+	
+	
+	public boolean fileExists(String fileName){
+		return !(getFileIndex(fileName)==-1);
 	}
 
+	
+	
+	
+	
+	
 //	public boolean loadFile(String fileName,String newName){
 //		boolean atEnd = false;
 //		int currentIndex = currentDirectory.getIndex();//start at current directory
@@ -243,7 +263,7 @@ public class DiskManager {
 
 	//////////free block managers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	public int getNextFreeBlock() throws FullDiskException{
+	private int getNextFreeBlock() throws FullDiskException{
 		int availableBlockIndex; 
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		if (freeBlockIndex==0){ // the disk is full.
@@ -263,23 +283,23 @@ public class DiskManager {
 	}
 
 
-	public void registerFreeBlocks(int block) {//check if copy to block doesnt rewrite what was previously on
+	private void registerFreeBlocks(int registeredBlockIndex) {//check if copy to block doesnt rewrite what was previously on
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		if (freeBlockIndex == 0)  { //There were no free blocks previous to this
 			DiskUtils.copyIntToBlock(vdb, 0, 0); //Copy 0 to root of this block.
-			freeBlockIndex=block; // This new registered block will become tree root.
+			freeBlockIndex=registeredBlockIndex; // This new registered block will become tree root.
 			endOfFreeBlockIndex = 4; //The array is currently empty; so the next available free block is itself.
-			diskUnit.write(block, vdb);
+			diskUnit.write(registeredBlockIndex, vdb);
 		}  
 		else if (endOfFreeBlockIndex>=blockSize) {      // the root node in the tree is full
 			DiskUtils.copyIntToBlock(vdb, 0, freeBlockIndex); //Copy parent as root of this block
-			freeBlockIndex=block; //Next free block will be picked from the subtree. 
+			freeBlockIndex=registeredBlockIndex; //Next free block will be picked from the subtree. 
 			endOfFreeBlockIndex=4; //The array is currently empty; so the next available free block is itself.
-			diskUnit.write(block, vdb);
+			diskUnit.write(registeredBlockIndex, vdb);
 		}  
 		else { //there is space on the current subtree root.
 			diskUnit.read(freeBlockIndex, vdb); //get all previous block information
-			DiskUtils.copyIntToBlock(vdb, endOfFreeBlockIndex, block); //Copy next free block's index onto this block
+			DiskUtils.copyIntToBlock(vdb, endOfFreeBlockIndex, registeredBlockIndex); //Copy next free block's index onto this block
 			endOfFreeBlockIndex+=4; //the current index will have an int; move it to the next index.
 			diskUnit.write(freeBlockIndex, vdb); //return original block plus new data.
 		}
@@ -288,30 +308,38 @@ public class DiskManager {
 	private int prepareFreeBlocksForUse(int fileSize) {//returns index of first block. Gets as many free blocks as the file needs and sets links up.
 		int totalBlocksUsed = (int)Math.ceil((double)fileSize/((double)blockSize-4.0));//formula used to determine how many blocks per file depending on file's size.
 		int currentBlock = 0;
-		int btr = 0;//for error
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		for(int x=0;x<totalBlocksUsed;x++){ // for each block needed, register a new free block.
 			int index = getNextFreeBlock();
-			if (x==0){//save the first file's block
-				btr = index;
-			}
 			DiskUtils.copyIntToBlock(vdb, blockSize-4, currentBlock); //write previous block's reference into current node's last int
 			diskUnit.write(index, vdb);
 			currentBlock = index;
 		}
-		return btr;
+		return currentBlock;
 	}
 
+	private int totalFreeBlocks() {
+		int counter = 0;
+		int currentFreeBlock = freeBlockIndex;
+		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+		while (currentFreeBlock!=0){
+			diskUnit.read(currentFreeBlock,vdb);
+			currentFreeBlock = DiskUtils.getIntFromBlock(vdb, 0);
+			counter++;
+		}
+		return counter;
+	}
 	//////INode Managers//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-	private void reclaimINode(int iNodeIndex){//returns iNode to used linked list. 
+	private void reclaimINode(int iNodeIndex){//returns iNode to used linked list. (Doesn't account for if the file is a directory yet)
 		int index =(int) getBlockIndexWithPosition(iNodeIndex).getY();
 		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb);
 		int currentFreeINodeIndex = firstFreeINode;
 		DiskUtils.copyIntToBlock(vdb, index+5, currentFreeINodeIndex); //sets this iNode's next to the head
+		diskUnit.write(blockPos, vdb);
 		firstFreeINode = iNodeIndex; //this iNode is the new head.
 	}
 
@@ -320,12 +348,12 @@ public class DiskManager {
 		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb);
-		firstFreeINode=DiskUtils.getIntFromBlock(vdb, index+5);
+		firstFreeINode=DiskUtils.getIntFromBlock(vdb, index+5);//sets the new free INode using "getNext"
 		return new INode(vdb.getElement(index),DiskUtils.getIntFromBlock(vdb, index+1),DiskUtils.getIntFromBlock(vdb, index+5));
 	}
-	private void setINodeAtIndex(int iNodeIndex, INode nta) { //sets new iNode given a free i node index.
-		int index =(int) getBlockIndexWithPosition(iNodeIndex).getY();
-		int blockPos = (int)getBlockIndexWithPosition(iNodeIndex).getX();
+	private void setINodeAtIndex(int freeINodeIndex, INode nta) { //sets new iNode given a free i node index.
+		int index =(int) getBlockIndexWithPosition(freeINodeIndex).getY();
+		int blockPos = (int)getBlockIndexWithPosition(freeINodeIndex).getX();
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb); //save previous information
 		firstFreeINode=DiskUtils.getIntFromBlock(vdb, index+5); //set the new free iNode head using the "getNext()"
@@ -350,9 +378,9 @@ public class DiskManager {
 		return mountName!=null;
 	}
 
-	private Point2D getBlockIndexWithPosition(int totalByteIndex){//first is block index, second is index within that block's array.
-		int index = (totalByteIndex%blockSize);
-		return new Point2D.Double((int)Math.floor(index/blockSize),index);
+	private Point2D getBlockIndexWithPosition(int totalByteIndex){
+		//first is block index, second is index within that block's array.
+		return new Point2D.Double((int)Math.floor(totalByteIndex/blockSize),totalByteIndex%blockSize);
 	}
 
 	public void stop(){

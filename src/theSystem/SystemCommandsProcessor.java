@@ -136,22 +136,22 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 			// Verifies if the disk has valid name and that it does not exist 
 			if (!OperandValidatorUtils.isValidName(diskName)){											
-				resultsList.add("Invalid name formation: " + diskName);
+				resultsList.add("\n Invalid name formation: " + diskName +"\n");
 			}
 			else if(commandManager.nameExists(diskName))	{													
-				resultsList.add("This disk already exists " + diskName);
+				resultsList.add("\n his disk already exists " + diskName+"\n");
 			}
 			else if(bsize<32 || !((bsize&-bsize)==bsize)){
-				resultsList.add("Disk block size must be greater than 32 and a power of 2: " + bsize);
+				resultsList.add("\n Disk block size must be greater than 32 and a power of 2: " + bsize+"\n");
 			}
 			else if(numberOfBlocks<32 || !((numberOfBlocks&-numberOfBlocks)==numberOfBlocks)){
-				resultsList.add("Disk block size must be greater than 32 and a power of 2: " + bsize);
+				resultsList.add("\n Disk block size must be greater than 32 and a power of 2: " +numberOfBlocks+"\n");
 			}
 			else {
 				DiskUnit.createDiskUnit(diskName, numberOfBlocks, bsize);
 				diskManager.prepareDiskUnit(diskName);
 				commandManager.addNewDiskToManager(diskName);
-				resultsList.add("Disk created!");					 
+				resultsList.add("\n Disk created!\n ");					 
 			}
 			return resultsList;
 		} 
@@ -167,17 +167,17 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			FixedLengthCommand fc = (FixedLengthCommand)c;
 			String diskName = fc.getOperand(1); 
 			if (!OperandValidatorUtils.isValidName(diskName)){											
-				resultsList.add("Invalid name formation: " + diskName); 
+				resultsList.add("\n Invalid name formation: " + diskName+"\n"); 
 			}
 			else if (diskManager.isMounted() && diskManager.getDiskName().equals(diskName)){											
-				resultsList.add("Cannot delete a mounted disk: " + diskName); 
+				resultsList.add("\n Cannot delete a mounted disk: " + diskName+" \n"); 
 			}
 			else if(!commandManager.nameExists(diskName))	{													
-				resultsList.add("Disk does not exist.");
+				resultsList.add("\n Disk does not exist. \n");
 			}
 			else {
 				commandManager.deleteDisk(diskName);
-				resultsList.add(diskName + " has been deleted.");
+				resultsList.add("\n"+diskName + " has been deleted. \n");
 			}
 			return resultsList;
 		}
@@ -193,23 +193,23 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			FixedLengthCommand fc = (FixedLengthCommand)c;
 			String diskName = fc.getOperand(1);
 			if (!OperandValidatorUtils.isValidName(diskName)){											
-				resultsList.add("Invalid name formation: " + diskName);
+				resultsList.add("\n Invalid name formation: " + diskName+" \n");
 			}
 
 			else if (diskManager.isMounted()){
 				if (diskManager.getDiskName().equals(diskName)){
-					resultsList.add("That disk is already mounted!");
+					resultsList.add("\n That disk is already mounted! \n");
 				}else{
-					resultsList.add("A disk is already mounted: "+diskManager.getDiskName()+"!");
+					resultsList.add("\n A disk is already mounted: "+diskManager.getDiskName()+"! \n");
 				}
 			}
 			else if(!(commandManager.nameExists(diskName))){
-				resultsList.add(diskName+" does not exist!");
+				resultsList.add("\n"+diskName+" does not exist! \n");
 			}
 			else{
 				try{
 					diskManager.mount(diskName);
-					resultsList.add(diskName+" is Mounted.");
+					resultsList.add("\n"+diskName+" is Mounted. \n");
 				}catch(Exception e){
 					e.printStackTrace();
 				}
@@ -225,11 +225,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
 			if(!diskManager.isMounted()){
-				resultsList.add("No disk is currently mounted.");
+				resultsList.add("\n No disk is currently mounted. \n");
 			}
 			else {
 				diskManager.stop();
-				resultsList.add("Disk has been successfully unmounted disk");
+				resultsList.add("\n Successfully unmounted disk. \n");
 			}
 			return resultsList;
 		}
@@ -248,14 +248,28 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			FixedLengthCommand fc = (FixedLengthCommand)c;
 			String fileToBeOverwritten = fc.getOperand(1);
 			String fileToBeRead = fc.getOperand(2);
-			if (!diskManager.isMounted()){
-				resultsList.add("No disk is currently mounted!");
-			}else if (!diskManager.fileExists(fileToBeRead)){
-				resultsList.add("No such file name: "+fileToBeRead+"!");
-			}else if (diskManager.fileExists(fileToBeOverwritten)){//overwrite file
-				resultsList.add(fileToBeRead+" has been overwritten!");
-			}else{//create file
-				resultsList.add("No such file name: "+fileToBeOverwritten+"! File has been created instead.");
+			//there must be a disk unit mounted.
+			if (!diskManager.isMounted()){ 
+				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
+				return resultsList;
+			}//The file must exist
+			if (!diskManager.fileExists(fileToBeRead)){ 
+				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
+				return resultsList;
+			}//there must be space for the file.
+			int fileToBeReadIndex = diskManager.getFileIndex(fileToBeRead);
+			if (!diskManager.isAvailableSpace(fileToBeReadIndex)){
+				resultsList.add("\n There is no more space left in disk! \n");
+			}//overwrite file
+			else if (diskManager.fileExists(fileToBeOverwritten)){
+				
+				
+				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+			}//create file
+			else{
+				
+				
+				resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
 			}
 			return resultsList;
 		}
