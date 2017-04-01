@@ -177,7 +177,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}
 			else {
 				commandManager.deleteDisk(diskName);
-				resultsList.add("\n"+diskName + " has been deleted. \n");
+				resultsList.add("\n "+diskName + " has been deleted. \n");
 			}
 			return resultsList;
 		}
@@ -257,17 +257,15 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
 				return resultsList;
 			}//there must be space for the file.
-			int fileToBeReadIndex = diskManager.getFileInDirectoryIndex(fileToBeRead);
+			int fileToBeReadIndex = diskManager.findInDirectory(fileToBeRead);
 			if (!diskManager.isAvailableSpace(fileToBeReadIndex)){
 				resultsList.add("\n There is no more space left in disk! \n");
 			}//overwrite file
 			else if (diskManager.fileExistsInDirectory(fileToBeOverwritten)){
 				diskManager.loadFileInDirectory(fileToBeRead, fileToBeOverwritten);
 				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
-			}//create file
-			else{
-				
-				
+			}else{//create file
+				diskManager.duplicateFile(fileToBeRead, fileToBeOverwritten);
 				resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
 			}
 			return resultsList;
