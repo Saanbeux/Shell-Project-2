@@ -74,10 +74,10 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		add(GENERALSTATE, SystemCommand.getFLSC("createdisk name int int", new createDiskProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("deletedisk name", new deleteDiskProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("loadfile name name", new loadFileProcessor())); 
-		//add(GENERALSTATE, SystemCommand.getFLSC("cp name name", new cpProcessor())); 
+		add(GENERALSTATE, SystemCommand.getFLSC("cp name name", new cpProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("mount name", new mountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("unmount", new unmountProcessor())); 
-		//add(GENERALSTATE, SystemCommand.getFLSC("ls", new lsProcessor())); 
+		add(GENERALSTATE, SystemCommand.getFLSC("ls", new lsProcessor())); 
 		//add(GENERALSTATE, SystemCommand.getFLSC("cat name", new catProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("showdisks", new showdisksProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("help", new HelpProcessor()));
@@ -187,7 +187,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 	private class mountProcessor implements CommandActionHandler{
 
-		@Override
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
 			FixedLengthCommand fc = (FixedLengthCommand)c;
@@ -214,7 +213,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 					e.printStackTrace();
 				}
 			}
-
 			return resultsList;
 		}
 	}
@@ -281,25 +279,78 @@ public class SystemCommandsProcessor extends CommandProcessor {
 
 		@Override
 		public ArrayList<String> execute(Command c) {
-			// TODO Auto-generated method stub
-			return null;
+			ArrayList<String> resultsList = new ArrayList<>();
+			FixedLengthCommand fc = (FixedLengthCommand)c;
+			String fileToBeOverwritten = fc.getOperand(1);
+			String fileToBeRead = fc.getOperand(2);
+			//there must be a disk unit mounted.
+			if (!diskManager.isMounted()){ 
+				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
+				return resultsList;
+			}//The file must exist
+			if (!diskManager.fileExistsInDirectory(fileToBeRead)){ 
+				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
+			}else if (diskManager.isDirectory(fileToBeRead)){
+				resultsList.add("\n File is not a data file! \n");
+			}
+			else if (!diskManager.fileExistsInDirectory(fileToBeOverwritten)){
+				resultsList.add("\n "+fileToBeRead+" does not exist! \n");
+			}else{
+				diskManager.loadFileInDirectory(fileToBeRead, fileToBeOverwritten);
+				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+			}
+			return resultsList;
 		}
 	}
+	
 	private class lsProcessor implements CommandActionHandler{
-
-		@Override
 		public ArrayList<String> execute(Command c) {
-			// TODO Auto-generated method stub
-			return null;
+			resultsList = new ArrayList<>();
+			if(!diskManager.isMounted()){
+				resultsList.add("\n No disk is currently mounted. \n");
+				return resultsList;
+			}
+			ArrayList<String> theNames = diskManager.listFilesInDirectory();
+			if (theNames.isEmpty()){
+				resultsList.add("\n Directory is empty. \n");
+			}else{
+				return theNames;
+			}
+			return resultsList;
 		}
 
 	}
+	
 	private class catProcessor implements CommandActionHandler{
 
-		@Override
 		public ArrayList<String> execute(Command c) {
-			// TODO Auto-generated method stub
-			return null;
+			resultsList = new ArrayList<>();
+			FixedLengthCommand fc = (FixedLengthCommand)c;
+			String diskName = fc.getOperand(1);
+			if (!OperandValidatorUtils.isValidName(diskName)){											
+				resultsList.add("\n Invalid name formation: " + diskName+" \n");
+			}
+
+			else if (diskManager.isMounted()){
+				if (diskManager.getDiskName().equals(diskName)){
+					resultsList.add("\n That disk is already mounted! \n");
+				}else{
+					resultsList.add("\n A disk is already mounted: "+diskManager.getDiskName()+"! \n");
+				}
+			}
+			else if(!(commandManager.nameExists(diskName))){
+				resultsList.add("\n"+diskName+" does not exist! \n");
+			}
+			else{
+				try{
+					diskManager.mount(diskName);
+					resultsList.add("\n"+diskName+" is Mounted. \n");
+				}catch(Exception e){
+					e.printStackTrace();
+				}
+			}
+
+			return resultsList;
 		}
 
 	}
