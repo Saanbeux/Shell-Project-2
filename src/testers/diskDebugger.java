@@ -26,9 +26,10 @@ public class diskDebugger {
 			}
 		}
 		for (int x=0;x<moyi.getCapacity();x++){
+			int firstFreeINode=moyi.getFirstFreeINode();
 			moyi.read(x, vdb);
 			INode iNode;
-			if (x<Math.ceil(moyi.getCapacity()/100)&&x!=0){
+			if (x<Math.ceil(moyi.getCapacity()/100)){
 				int h=0;
 				for(int j=0; j<moyi.getBlockSize()*moyi.getCapacity()/900;){
 					iNode = new INode(vdb.getElement(h),DiskUtils.getIntFromBlock(vdb, h+1),DiskUtils.getIntFromBlock(vdb, h+5));
