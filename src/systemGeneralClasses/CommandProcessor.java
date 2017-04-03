@@ -78,6 +78,7 @@ public abstract class CommandProcessor {
 	}
 
 	
+	@SuppressWarnings("unchecked")
 	protected void createCommandList(int nStates) { 
 		commandList = (ArrayList<SystemCommand>[]) new ArrayList[nStates]; 
 		for (int p=0; p<commandList.length; p++)

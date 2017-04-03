@@ -1,5 +1,6 @@
 package exceptions;
 
+@SuppressWarnings("serial")
 public class InvalidIntListExprComponentException extends Exception {
 
 	public InvalidIntListExprComponentException() {

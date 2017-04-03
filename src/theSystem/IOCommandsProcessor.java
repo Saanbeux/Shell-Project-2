@@ -35,7 +35,7 @@ public class IOCommandsProcessor extends CommandProcessor {
 		// the system starts in sate GENERALSTATE - upper class static field
 		currentState.push(GENERALSTATE); 
 
-		outputBlockLength = 10;    // default block lenght is 10
+		outputBlockLength = 10;    // default block length is 10
 		currentIndex = 0; 
 		hasOutputToProcess = false; 
 		this.currentIndex = 0; 

@@ -26,9 +26,4 @@ public class INode{
 	public void setIndex(int index) {
 		this.index = index;
 	}
-	public void clean() {
-		index = (Integer) null; 
-		size = (Integer) null;
-		type = (Byte) null;
-	}
 }

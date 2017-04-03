@@ -4,6 +4,7 @@ package disk_Exceptions;
  * @author Moises Garip
  *
  */
+@SuppressWarnings("serial")
 public class InvalidParameterException extends RuntimeException {
 	public InvalidParameterException()
 	{

@@ -4,6 +4,7 @@ package disk_Exceptions;
  * @author Moises Garip
  *
  */
+@SuppressWarnings("serial")
 public class FullDirectoryException extends RuntimeException{
 
 	public FullDirectoryException(){}

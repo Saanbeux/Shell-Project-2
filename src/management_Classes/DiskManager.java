@@ -9,6 +9,7 @@ import diskUtilities.VirtualDiskBlock;
 import disk_Exceptions.FullDiskException;
 /**
  * Creates an object to manage disk units separately.
+ * @author Moises Garip
  */
 public class DiskManager {
 	DiskUnit diskUnit;
@@ -22,14 +23,14 @@ public class DiskManager {
 	private int firstFreeINode;
 	private int totalINodes;
 
-	
+
 	public DiskManager(){}
-/**
- * Prepares a recently created disk unit for formatting, preparing iNodes and free blocks for future use.
- * @param diskName recently created disk's name
- */
+	/**
+	 * Prepares a recently created disk unit for formatting, preparing iNodes and free blocks for future use.
+	 * @param diskName recently created disk's name
+	 */
 	public void prepareDiskUnit(String diskName){
-		//constants; will always be in the diskunit regardless if it was created recently.
+		//constants; will always be in the disk unit regardless if it was created recently.
 		diskUnit = DiskUnit.mount(diskName);
 
 		capacity = diskUnit.getCapacity();
@@ -42,35 +43,39 @@ public class DiskManager {
 
 		formatFreeBlockSpace(); //prepare free blocks in DiskUnit
 		formatINodeSpace(); // prepare INodes in DiskUnit
-		int rootFileSize = blockSize; //test size for root file in directory
-
+		
+		//test size for root file in directory
 		//creates a root of size blockSize, sets the file's size to how many blocks it actually takes up.
-		addINode(new INode((byte)0,((int)Math.ceil((double)rootFileSize/((double)blockSize-4.0)))*blockSize,prepareFreeBlocksForUse(rootFileSize))); //create root file's INode.
+		addINode(new INode((byte)0,((int)Math.ceil((double)blockSize/((double)blockSize-4.0)))*blockSize,prepareFreeBlocksForUse(blockSize))); //create root file's INode.
 		stop();
 		diskUnit.shutdown();
 	}
 
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
 
 	////////formatters////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
- * Prepares iNodes for use. Every unused iNode's index parameter points towards the next free iNode. The last iNode points to 0; meaning there are no more iNodes.
- */
+	/**
+	 * Prepares iNodes for use. Every unused iNode's index parameter points towards the next free iNode. The last iNode points to 0; meaning there are no more iNodes.
+	 */
 	private void formatINodeSpace(){
 		int remainingINodes = totalINodes;
-		int nextINode = blockSize+9; //next available INode
+		int nextINode = blockSize+9; //offset the first iNode, it is being accounted for as the head with "nextFreeINode"
 		int currentBlock = 0; //start at first block
 		while (remainingINodes>0){ //while there are INodes left to register
 			int currentIndex = 5; //start at first INode-in-block's "fileIndex" property; resets counter.
 			int maxINodesPerBlock = blockSize/9; // reset counter
 			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize); 
 			while (maxINodesPerBlock>1){ // while there is still space in block
+				if(remainingINodes==0){
+					diskUnit.write(currentBlock, vdb);
+					return;
+				}
 				DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode); //write next available INode on to current iNode's fileINdex property.
 				currentIndex+=9; //advance to next index within block
 				nextINode+=9; //Advance to next INode to store
@@ -83,16 +88,19 @@ public class DiskManager {
 				return;
 			}
 			currentBlock++;
-			nextINode = (currentBlock*blockSize); //get firstINode at next block.
+			nextINode+= blockSize%(blockSize/9); //Account for extra space at end of block
 			DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode); //copy first INode of next block onto lastiNode of previous block.
 			diskUnit.write(currentBlock, vdb);
 		}
 	}
 
-/**
- * Prepares free blocks for use. Every block that is not used for control or iNodes will be put into a tree-like structure,
- *  where each free block is either used to store other free blocks or indexed into 4 of another free block's bytes.
- */
+	
+	
+	
+	/**
+	 * Prepares free blocks for use. Every block that is not used for control or iNodes will be put into a tree-like structure,
+	 *  where each free block is either used to store other free blocks or indexed into 4 of another free block's bytes.
+	 */
 	private void formatFreeBlockSpace(){ 
 		int totalINodeBlocks = (int)Math.ceil((double)capacity/100);
 		int stillFreeSpace = capacity-totalINodeBlocks; //Amount of FreeBlocks left in an empty DiskUnit
@@ -105,15 +113,15 @@ public class DiskManager {
 	}
 
 
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
+
 	/////////File Managers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/**
 	 * Finds a file name in the current directory.
@@ -142,11 +150,11 @@ public class DiskManager {
 		}
 		return -1;//file does not exist
 	}
-/**
- * Finds a file in current disk directory, deletes name, iNode, and file associatd to iNode.
- * @param fileName file to find in directory.
- * @return Index of free file space within directory. -1 if no such file was found.
- */
+	/**
+	 * Finds a file in current disk directory, deletes name, iNode, and file associatd to iNode.
+	 * @param fileName file to find in directory.
+	 * @return Index of free file space within directory. -1 if no such file was found.
+	 */
 	private int deleteFileInDirectory(String fileName){ 
 		int fileIndex = findInDirectory(fileName);
 		if(fileIndex==-1){
@@ -165,13 +173,13 @@ public class DiskManager {
 		return fileIndex+24;//return former position of file for rewritting
 	}
 
-/**
- * Takes file in directory and copies it contents into new blocks.
- * @param fileName file to copy in directory.
- * @return Index of new file copy created. -1 if file not found.
- */
+	/**
+	 * Takes file in directory and copies it contents into new blocks.
+	 * @param fileName file to copy in directory.
+	 * @return Index of new file copy created. -1 if file not found.
+	 */
 	private int copyFileContents(String fileName){
-		
+
 		//gets file in directory, reads it's iNode, returning the location of the iNode's file
 		int position = findInDirectory(fileName);
 		if (position ==-1){
@@ -192,24 +200,27 @@ public class DiskManager {
 		}
 		return btr;
 	}
-/**
- * Takes a file, verifies if there is space in disk and directory to overwrite a second file, and overwrites it.
- * @param fileToRead file to be copied.
- * @param fileToOverwrite file replaced by copy
- * @return 0 if successful, 1 if unsuccessful.
- */
+	/**
+	 * Takes a file, verifies if there is space in disk and directory to overwrite a second file, and overwrites it.
+	 * @param fileToRead file to be copied.
+	 * @param fileToOverwrite file replaced by copy
+	 * @return 0 if successful, 1 if unsuccessful.
+	 */
 	public int loadFile(String fileToRead,String fileToOverwrite){
 		INode ntc = getINodeAtIndex(findInDirectory(fileToRead)+20); //gets iNode of file being read within directory
 		if(!isAvailableSpace(findInDirectory(fileToRead))){
 			return 1;
 		}
-		int fileToOverwriteINodeIndex = findInDirectory(fileToOverwrite)+20;
+		int fileToOverwriteIndex = findInDirectory(fileToOverwrite);
 		deleteFileInDirectory(fileToOverwrite);//reclaim space used by file that is being overwritten; name is deleted,
-		
-		//needs to write name in again. Needs to check for space
-		
+		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+		Point2D position = getPosition(fileToOverwriteIndex);
+		diskUnit.read((int)position.getX(), vdb);
+		for(int x=0; x<fileToOverwrite.length();x++){//rewrites name onto block.
+			DiskUtils.copyCharToBlock(vdb, x+(int)position.getY(), fileToOverwrite.charAt(x));
+		}
 		ntc.setIndex(copyFileContents(fileToRead));//leave iNode as is, since most of the information is the same, but set new index to the recently created copy.
-		setINodeAtIndex(fileToOverwriteINodeIndex,ntc);//place copied file's iNode to the overwritten file's iNode location.
+		setINodeAtIndex(fileToOverwriteIndex+20,ntc);//place copied file's iNode to the overwritten file's iNode location.
 		return 0;
 	}
 	/**
@@ -232,12 +243,12 @@ public class DiskManager {
 		diskUnit.write(index, vdb);
 		return 0;
 	}
-/**
- * Takes a file and verifies if there is space to make a copy of it by comparing free blocks required to
- * recreate it and available iNodes.
- * @param fileToBeReadIndex file to verify space.
- * @return True if there is space to make a copy, false otherwise..
- */
+	/**
+	 * Takes a file and verifies if there is space to make a copy of it by comparing free blocks required to
+	 * recreate it and available iNodes.
+	 * @param fileToBeReadIndex file to verify space.
+	 * @return True if there is space to make a copy, false otherwise..
+	 */
 	public boolean isAvailableSpace(int fileToBeReadIndex) {
 		if(!(firstFreeINode==0)&&getAvailableFileSpaceInDirectory()!=-1){ //if 0; there are no INodes, no new file may be created.
 			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
@@ -322,26 +333,26 @@ public class DiskManager {
 	 * @return Array of file's data.
 	 */
 	public ArrayList<String> readDataFile(String fileName) {
-		
+
 		return null;
 	}
 
 
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
 
 	//////////free block managers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**
- * Finds and returns a free block within the free block tree.
- * @return index of a free block.
- * @throws FullDiskException when there are no free blocks.
- */
+	/**
+	 * Finds and returns a free block within the free block tree.
+	 * @return index of a free block.
+	 * @throws FullDiskException when there are no free blocks.
+	 */
 	private int getNextFreeBlock() throws FullDiskException{
 		int availableBlockIndex; 
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
@@ -363,10 +374,10 @@ public class DiskManager {
 		return availableBlockIndex;
 	}
 
-/**
- * Returns a block that was in use to the free block tree.
- ** @param BlockToRegisterIndex block that will be added back into tree.
- */
+	/**
+	 * Returns a block that was in use to the free block tree.
+	 ** @param BlockToRegisterIndex block that will be added back into tree.
+	 */
 	private void registerFreeBlocks(int BlockToRegisterIndex) {//check if copy to block doesnt rewrite what was previously on
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		if (freeBlockIndex == 0)  { //There were no free blocks previous to this
@@ -390,28 +401,29 @@ public class DiskManager {
 		diskUnit.setEndOfFreeBlockIndex(endOfFreeBlockIndex);
 		diskUnit.setFreeBlockIndex(freeBlockIndex);
 	}     
-/**
- * Prepares free blocks for use in a file, allocating the minimum required blocks for the file and setting the last 4 bytes
- * to point towards the next block in file.
- * @param fileSize size of file to prepare blocks for.
- * @return index of free block where file will begin to be stored.
- */
+	/**
+	 * Prepares free blocks for use in a file, allocating the minimum required blocks for the file and setting the last 4 bytes
+	 * to point towards the next block in file.
+	 * @param fileSize size of file to prepare blocks for.
+	 * @return index of free block where file will begin to be stored.
+	 */
 	private int prepareFreeBlocksForUse(int fileSize) {//returns index of first block. Gets as many free blocks as the file needs and sets links up.
 		int totalBlocksUsed = (int)Math.ceil((double)fileSize/((double)blockSize-4.0));//formula used to determine how many blocks per file depending on file's size.
 		int currentBlock = 0;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-		for(int x=0;x<totalBlocksUsed;x++){ // for each block needed, register a new free block.
+		while(totalBlocksUsed>0){ // for each block needed, register a new free block.
 			int index = getNextFreeBlock();
 			DiskUtils.copyIntToBlock(vdb, blockSize-4, currentBlock); //write previous block's reference into current node's last int
 			diskUnit.write(index, vdb);
 			currentBlock = index;
+			totalBlocksUsed--;
 		}
 		return currentBlock;
 	}
-/**
- * Calculates total free blocks for use.
- * @return amount of free blocks.
- */
+	/**
+	 * Calculates total free blocks for use.
+	 * @return amount of free blocks.
+	 */
 	private int totalFreeBlocks() {
 		int counter = 0;
 		int currentFreeBlock = freeBlockIndex;
@@ -423,10 +435,10 @@ public class DiskManager {
 		}
 		return counter;
 	}
-/**
- * Returns all blocks of a file to the free block tree.
- * @param blockIndex first index of file to reclaim
- */
+	/**
+	 * Returns all blocks of a file to the free block tree.
+	 * @param blockIndex first index of file to reclaim
+	 */
 	private void reclaimFreeBlocks(int blockIndex){
 		VirtualDiskBlock empty = new VirtualDiskBlock(blockSize);
 		VirtualDiskBlock current = new VirtualDiskBlock(blockSize);
@@ -437,20 +449,20 @@ public class DiskManager {
 			blockIndex = DiskUtils.getIntFromBlock(current, blockSize-4);//get next block
 		}
 	}
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
 	//////INode Managers//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
- * Returns iNode to iNode linked list for later use.
- * @param iNodeIndex index of a file's iNode
- */
+	/**
+	 * Returns iNode to iNode linked list for later use.
+	 * @param iNodeIndex index of a file's iNode
+	 */
 	private void reclaimINode(int iNodeIndex){//returns iNode to used linked list. (Doesn't account for if the file is a directory yet)
 		int index =(int) getPosition(iNodeIndex).getY();
 		int blockPos = (int)getPosition(iNodeIndex).getX();
@@ -461,11 +473,11 @@ public class DiskManager {
 		firstFreeINode = iNodeIndex; //this iNode is the new head.
 		diskUnit.setFirstFreeINode(firstFreeINode);
 	}
-/**
- * Gets iNode at an index.
- * @param iNodeIndex index of a file's iNode.
- * @return file's iNode.
- */
+	/**
+	 * Gets iNode at an index.
+	 * @param iNodeIndex index of a file's iNode.
+	 * @return file's iNode.
+	 */
 	public INode getINodeAtIndex(int iNodeIndex) { //returns iNode at this index.
 		int index =(int) getPosition(iNodeIndex).getY();
 		int blockPos = (int)getPosition(iNodeIndex).getX();
@@ -544,7 +556,7 @@ public class DiskManager {
 		mountName = diskName;
 	}
 	/**
-	 * Shuts down mount;
+	 * Shuts down mount
 	 */
 	public void stop(){
 		diskUnit.shutdown();

@@ -5,6 +5,7 @@ package disk_Exceptions;
  *
  */
 //
+@SuppressWarnings("serial")
 public class ExistingDiskException extends RuntimeException{
 	public ExistingDiskException()
 	{

@@ -92,6 +92,7 @@ public class SystemController {
 
 	private Command makeCommand(CommandLine cLine) { 
 		SystemCommand sc = cLine.getSc(); 
+		@SuppressWarnings("unused")
 		CommandValidator cv = sc.getCommandValidator(); 
 		return new FixedLengthCommand(cLine); 
 	}
