@@ -1,4 +1,4 @@
-package management_Classes;
+package managementClasses;
 
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -43,12 +43,11 @@ public class DiskManager {
 
 		formatFreeBlockSpace(); //prepare free blocks in DiskUnit
 		formatINodeSpace(); // prepare INodes in DiskUnit
-		
+
 		//test size for root file in directory
 		//creates a root of size blockSize, sets the file's size to how many blocks it actually takes up.
-		addINode(new INode((byte)0,((int)Math.ceil((double)blockSize/((double)blockSize-4.0)))*blockSize,prepareFreeBlocksForUse(blockSize))); //create root file's INode.
+		currentDirectory=getINodeAtIndex(setINodeAtIndex(blockSize, new INode((byte)0,((int)Math.ceil((double)blockSize/((double)blockSize-4.0)))*blockSize,prepareFreeBlocksForUse(blockSize)))); //create root file's INode.
 		stop();
-		diskUnit.shutdown();
 	}
 
 
@@ -94,9 +93,9 @@ public class DiskManager {
 		}
 	}
 
-	
-	
-	
+
+
+
 	/**
 	 * Prepares free blocks for use. Every block that is not used for control or iNodes will be put into a tree-like structure,
 	 *  where each free block is either used to store other free blocks or indexed into 4 of another free block's bytes.
@@ -142,7 +141,7 @@ public class DiskManager {
 					stringCounter++;
 				}
 				if (tempName.equals(fileName)){//at file.
-					return (((currentBlock*blockSize)-blockSize)+counter);
+					return ((currentBlock*blockSize)-blockSize+counter);
 				}
 				counter+=24;//advance to next file
 			}
@@ -151,7 +150,7 @@ public class DiskManager {
 		return -1;//file does not exist
 	}
 	/**
-	 * Finds a file in current disk directory, deletes name, iNode, and file associatd to iNode.
+	 * Finds a file in current disk directory, deletes name, iNode, and file associated to iNode.
 	 * @param fileName file to find in directory.
 	 * @return Index of free file space within directory. -1 if no such file was found.
 	 */
@@ -337,8 +336,23 @@ public class DiskManager {
 		return null;
 	}
 
-
-
+	/**
+	 * creates a dummy file for testing file methods.
+	 * @param fileSize size of file
+	 * @param fileName name of file
+	 */
+	public void testFiles(String fileName, int fileSize){
+		int fileIndex = prepareFreeBlocksForUse(fileSize);
+		int iNodeIndex = addINode(new INode((byte)0,fileSize,fileIndex));
+		int directoryIndex = getAvailableFileSpaceInDirectory();
+		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+		diskUnit.read((int)getPosition(directoryIndex).getX(), vdb);
+		for(int x=0; x<fileName.length();x++){
+			DiskUtils.copyCharToBlock(vdb, x+(int)getPosition(directoryIndex).getY(), fileName.charAt(x));
+		}
+		DiskUtils.copyIntToBlock(vdb, (int)getPosition(directoryIndex).getY()+20, iNodeIndex);
+		diskUnit.write((int)getPosition(directoryIndex).getX(), vdb);
+	}
 
 
 
@@ -465,7 +479,7 @@ public class DiskManager {
 	 */
 	private void reclaimINode(int iNodeIndex){//returns iNode to used linked list. (Doesn't account for if the file is a directory yet)
 		int index =(int) getPosition(iNodeIndex).getY();
-		int blockPos = (int)getPosition(iNodeIndex).getX();
+		int blockPos = (int)getPosition(iNodeIndex).getX()-1;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb);
 		DiskUtils.copyIntToBlock(vdb, index+5, firstFreeINode); //sets this iNode's next to the head
@@ -480,7 +494,7 @@ public class DiskManager {
 	 */
 	public INode getINodeAtIndex(int iNodeIndex) { //returns iNode at this index.
 		int index =(int) getPosition(iNodeIndex).getY();
-		int blockPos = (int)getPosition(iNodeIndex).getX();
+		int blockPos = (int)getPosition(iNodeIndex).getX()-1;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb);
 		return new INode(vdb.getElement(index),DiskUtils.getIntFromBlock(vdb, index+1),DiskUtils.getIntFromBlock(vdb, index+5));
@@ -489,27 +503,29 @@ public class DiskManager {
 	 * Overwrites an iNode at an index; used for creating and overwriting files.
 	 * @param indexToAdd index of iNode to overwrite.
 	 * @param nta iNode that will overwrite.
+	 * @return index of added iNode.
 	 */
-	private void setINodeAtIndex(int indexToAdd, INode nta) { //sets new iNode given an i node index; overwrites an iNode at that position
+	private int setINodeAtIndex(int indexToAdd, INode nta) { //sets new iNode given an i node index; overwrites an iNode at that position
 		int index =(int) getPosition(indexToAdd).getY();
-		int blockPos = (int)getPosition(indexToAdd).getX();
+		int blockPos = (int)getPosition(indexToAdd).getX()-1;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		diskUnit.read(blockPos, vdb); //save previous information
-		if(indexToAdd==firstFreeINode){//if adding over the next free Inode, set the next free iNode using getnext
-			firstFreeINode = getINodeAtIndex(firstFreeINode).getIndex();
-			diskUnit.setFirstFreeINode(firstFreeINode);
-		}
 		vdb.setElement(index,nta.getType()); //Set new type
 		DiskUtils.copyIntToBlock(vdb, index+1,nta.getSize()); //set new Size
 		DiskUtils.copyIntToBlock(vdb, index+5,nta.getIndex()); //set new Index
 		diskUnit.write(blockPos, vdb);
+		return indexToAdd;
 	}
 	/**
 	 * Creates a file's iNode.
 	 * @param nta iNode to add.
+	 * @return node's index
 	 */
-	private void addINode(INode nta) { //Adds iNode to list
-		setINodeAtIndex(firstFreeINode,nta);
+	private int addINode(INode nta) { //Adds iNode to list
+		int temp = firstFreeINode;
+		firstFreeINode = getINodeAtIndex(firstFreeINode).getIndex();
+		diskUnit.setFirstFreeINode(firstFreeINode);
+		return setINodeAtIndex(temp,nta);
 	}
 
 
@@ -552,7 +568,7 @@ public class DiskManager {
 		endOfFreeBlockIndex = diskUnit.getEndOfFreeBlockIndex();
 		firstFreeINode = diskUnit.getFirstFreeINode();
 		totalINodes = diskUnit.getTotalINodes();
-		currentDirectory = getINodeAtIndex(0);
+		currentDirectory = getINodeAtIndex(blockSize);
 		mountName = diskName;
 	}
 	/**

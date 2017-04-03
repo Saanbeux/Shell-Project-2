@@ -7,7 +7,7 @@ import java.io.RandomAccessFile;
 import diskUtilities.DiskUnit;
 import diskUtilities.DiskUtils;
 import diskUtilities.VirtualDiskBlock;
-import management_Classes.INode;
+import managementClasses.INode;
 
 @SuppressWarnings("unused")
 public class diskDebugger {
@@ -37,6 +37,6 @@ public class diskDebugger {
 				}
 			}
 		}
-		//reads every virtual disk block in disk for reading through debugger.
+		//reads every virtual disk block in disk for analyzing through debugger.
 	}
 }

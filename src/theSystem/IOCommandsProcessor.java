@@ -3,7 +3,7 @@ package theSystem;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-import management_Classes.IntStack;
+import managementClasses.IntStack;
 import systemGeneralClasses.Command;
 import systemGeneralClasses.CommandActionHandler;
 import systemGeneralClasses.CommandLine;

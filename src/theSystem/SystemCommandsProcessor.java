@@ -3,9 +3,9 @@ package theSystem;
 import java.util.ArrayList;
 
 import diskUtilities.DiskUnit;
-import management_Classes.CommandManager;
-import management_Classes.DiskManager;
-import management_Classes.IntStack;
+import managementClasses.CommandManager;
+import managementClasses.DiskManager;
+import managementClasses.IntStack;
 import operandHandlers.OperandValidatorUtils;
 import systemGeneralClasses.Command;
 import systemGeneralClasses.CommandActionHandler;
@@ -74,6 +74,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		add(GENERALSTATE, SystemCommand.getFLSC("cp name name", new cpProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("mount name", new mountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("unmount", new unmountProcessor())); 
+		add(GENERALSTATE, SystemCommand.getFLSC("createfile name int", new CreateFileProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("ls", new lsProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("cat name", new catProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("showdisks", new showdisksProcessor()));
@@ -273,9 +274,36 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		}
 
 	}
+	
+	
+	
+	
+	
+	
+	private class CreateFileProcessor implements CommandActionHandler{
+
+		public ArrayList<String> execute(Command c) {
+			ArrayList<String> resultsList = new ArrayList<>();
+			FixedLengthCommand fc = (FixedLengthCommand)c;
+			String fileName = fc.getOperand(1);
+			int fileSize  = Integer.parseInt(fc.getOperand(2));
+			//there must be a disk unit mounted.
+			if (!diskManager.isMounted()){ 
+				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
+				return resultsList;
+			}
+			diskManager.testFiles(fileName,fileSize);
+			resultsList.add("\n File created! \n");
+			return resultsList;
+		}
+
+	}
 
 
-
+	
+	
+	
+	
 
 
 	private class cpProcessor implements CommandActionHandler{

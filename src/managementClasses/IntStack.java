@@ -1,4 +1,4 @@
-package management_Classes;
+package managementClasses;
 
 import exceptions.EmptyStackException;
 import exceptions.FullStackException;

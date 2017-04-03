@@ -1,4 +1,4 @@
-package management_Classes;
+package managementClasses;
 
 /**
  * Object that conveniently stores a physical iNode's details.

@@ -1,4 +1,4 @@
-package management_Classes;
+package managementClasses;
 
 import java.io.File;
 import java.io.FileNotFoundException;
