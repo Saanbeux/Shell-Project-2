@@ -3,7 +3,8 @@ package systemGeneralClasses;
 
 import java.util.ArrayList;
 
-import stack.IntStack;
+import management_Classes.IntStack;
+
 
 /**
  * 

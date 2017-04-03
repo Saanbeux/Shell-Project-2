@@ -8,7 +8,7 @@ import disk_Exceptions.ExistingDiskException;
 import disk_Exceptions.InvalidBlockException;
 import disk_Exceptions.InvalidBlockNumberException;
 import disk_Exceptions.NonExistingDiskException;
-import listsManagementClasses.DiskManager;
+import management_Classes.DiskManager;
 
 /**
  * A sequence of virtual disk blocks physically stored within a 

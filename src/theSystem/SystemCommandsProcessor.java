@@ -1,15 +1,12 @@
 package theSystem;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 
 import diskUtilities.DiskUnit;
-import disk_Exceptions.NonExistingDiskException;
-import listsManagementClasses.CommandManager;
-import listsManagementClasses.DiskManager;
+import management_Classes.CommandManager;
+import management_Classes.DiskManager;
+import management_Classes.IntStack;
 import operandHandlers.OperandValidatorUtils;
-import stack.IntStack;
 import systemGeneralClasses.Command;
 import systemGeneralClasses.CommandActionHandler;
 import systemGeneralClasses.CommandProcessor;
@@ -78,7 +75,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		add(GENERALSTATE, SystemCommand.getFLSC("mount name", new mountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("unmount", new unmountProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("ls", new lsProcessor())); 
-		//add(GENERALSTATE, SystemCommand.getFLSC("cat name", new catProcessor())); 
+		add(GENERALSTATE, SystemCommand.getFLSC("cat name", new catProcessor())); 
 		add(GENERALSTATE, SystemCommand.getFLSC("showdisks", new showdisksProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("help", new HelpProcessor()));
 		add(GENERALSTATE, SystemCommand.getFLSC("exit", new ShutDownProcessor()));
@@ -260,11 +257,17 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("\n There is no more space left in disk! \n");
 			}//overwrite file
 			else if (diskManager.fileExistsInDirectory(fileToBeOverwritten)){
-				diskManager.loadFileInDirectory(fileToBeRead, fileToBeOverwritten);
-				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+				if(diskManager.loadFile(fileToBeRead, fileToBeOverwritten)==1){
+					resultsList.add("\n No available space for overwrite. \n");
+				}else{
+					resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+				}
 			}else{//create file
-				diskManager.duplicateFile(fileToBeRead, fileToBeOverwritten);
-				resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
+				if(diskManager.duplicateFile(fileToBeRead, fileToBeOverwritten)==1){
+					resultsList.add("\n No available space for overwrite. \n");
+				}else{
+					resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
+				}
 			}
 			return resultsList;
 		}
@@ -281,8 +284,8 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		public ArrayList<String> execute(Command c) {
 			ArrayList<String> resultsList = new ArrayList<>();
 			FixedLengthCommand fc = (FixedLengthCommand)c;
-			String fileToBeOverwritten = fc.getOperand(1);
-			String fileToBeRead = fc.getOperand(2);
+			String fileToBeOverwritten = fc.getOperand(2);
+			String fileToBeRead = fc.getOperand(1);
 			//there must be a disk unit mounted.
 			if (!diskManager.isMounted()){ 
 				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
@@ -296,13 +299,16 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			else if (!diskManager.fileExistsInDirectory(fileToBeOverwritten)){
 				resultsList.add("\n "+fileToBeRead+" does not exist! \n");
 			}else{
-				diskManager.loadFileInDirectory(fileToBeRead, fileToBeOverwritten);
-				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+				if(diskManager.loadFile(fileToBeRead, fileToBeOverwritten)==1){
+					resultsList.add("\n No available space for overwrite. \n");
+				}else{
+					resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+				}
 			}
 			return resultsList;
 		}
 	}
-	
+
 	private class lsProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
@@ -310,7 +316,7 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("\n No disk is currently mounted. \n");
 				return resultsList;
 			}
-			ArrayList<String> theNames = diskManager.listFilesInDirectory();
+			ArrayList<String> theNames = diskManager.listFiles();
 			if (theNames.isEmpty()){
 				resultsList.add("\n Directory is empty. \n");
 			}else{
@@ -318,38 +324,30 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			}
 			return resultsList;
 		}
-
 	}
-	
+
 	private class catProcessor implements CommandActionHandler{
 
-		public ArrayList<String> execute(Command c) {
+		public ArrayList<String> execute(Command c) {//check if exists in directory, check if is data or directory
 			resultsList = new ArrayList<>();
 			FixedLengthCommand fc = (FixedLengthCommand)c;
-			String diskName = fc.getOperand(1);
-			if (!OperandValidatorUtils.isValidName(diskName)){											
-				resultsList.add("\n Invalid name formation: " + diskName+" \n");
-			}
-
-			else if (diskManager.isMounted()){
-				if (diskManager.getDiskName().equals(diskName)){
-					resultsList.add("\n That disk is already mounted! \n");
+			String fileName = fc.getOperand(1);
+			if (!OperandValidatorUtils.isValidName(fileName)){											
+				resultsList.add("\n Invalid name : " +fileName+" \n");
+			}else if (!diskManager.isMounted()){ //No disk mounted
+				resultsList.add("\n No disk is currently mounted. \n");
+			}else if(!(diskManager.fileExistsInDirectory(fileName))){ //file doesn't exist
+				resultsList.add("\n"+fileName+" does not exist! \n");
+			}else if (diskManager.isDirectory(fileName)){ //file is directory
+				ArrayList<String>theNames = diskManager.listFilesAtINode(diskManager.getINodeAtIndex(diskManager.findInDirectory(fileName)+20));
+				if(theNames.isEmpty()){
+					resultsList.add("\n File is empty. \n");
 				}else{
-					resultsList.add("\n A disk is already mounted: "+diskManager.getDiskName()+"! \n");
+					return theNames;
 				}
+			}else{//file is a data file
+				return diskManager.readDataFile(fileName);
 			}
-			else if(!(commandManager.nameExists(diskName))){
-				resultsList.add("\n"+diskName+" does not exist! \n");
-			}
-			else{
-				try{
-					diskManager.mount(diskName);
-					resultsList.add("\n"+diskName+" is Mounted. \n");
-				}catch(Exception e){
-					e.printStackTrace();
-				}
-			}
-
 			return resultsList;
 		}
 

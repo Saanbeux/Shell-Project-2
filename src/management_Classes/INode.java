@@ -1,5 +1,10 @@
-package lists;
+package management_Classes;
 
+/**
+ * Object that conveniently stores a physical iNode's details.
+ * @author Moises
+ *
+ */
 public class INode{
 	private int index; 
 	private int size;
