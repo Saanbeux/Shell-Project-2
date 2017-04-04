@@ -256,7 +256,7 @@ public class DiskUnit {
 			disk.writeInt(blockSize);
 			disk.writeInt(0); //no registered blocks yet. Measured in block positions
 			disk.writeInt(0); //index is empty; the only one available is itself. Measured block indexes, from 0 to blockSize
-			disk.writeInt(blockSize+9); //first available i-Node; Measured in bytes; offsets control.
+			disk.writeInt(blockSize); //first available i-Node; Measured in bytes; offsets control.
 			if (((capacity*blockSize)/900)< blockSize/9){ //If the total amount is less than a block, fill that block. Making due with the space.
 				disk.writeInt(blockSize/9);//total iNodes available
 			}else{

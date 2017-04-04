@@ -1,5 +1,6 @@
 package theSystem;
 
+import java.io.File;
 import java.util.ArrayList;
 
 import diskUtilities.DiskUnit;
@@ -94,7 +95,12 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	public ArrayList<String> getResultsList() { 
 		return resultsList; 
 	}
-
+/**
+ * Creates a processor for handling the printing of every disk available
+ * within the system.
+ * @author Moises
+ *
+ */
 	private class showdisksProcessor implements CommandActionHandler{
 		@Override
 		public ArrayList<String> execute(Command c) {
@@ -122,6 +128,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		}
 
 	}
+	/**
+	 * Creates a processor that handles the creation of a disk and its formatting.
+	 * @author Moises
+	 *
+	 */
 	private class createDiskProcessor implements CommandActionHandler{
 
 		@Override
@@ -156,7 +167,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	}
 
 
-
+	/**
+	 * Creates a processor that handles the deletion of a disk from the system.
+	 * @author Moises
+	 *
+	 */
 	private class deleteDiskProcessor implements CommandActionHandler{
 
 		@Override
@@ -182,7 +197,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	}
 
 
-
+/**
+ * Creates a processor for handling the mounting of a disk, necessary for other commands.
+ * @author Moises
+ *
+ */
 	private class mountProcessor implements CommandActionHandler{
 
 		public ArrayList<String> execute(Command c) {
@@ -216,7 +235,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	}
 
 
-
+/**
+ * Creates a processor for handling the unmounting of a disk.
+ * @author Moises
+ *
+ */
 	private class unmountProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
@@ -233,9 +256,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 	}
 
 
-
-
-
+/**
+ * Creates a processor for handling an import of an external file into a disk. 
+ * @author Moises
+ *
+ */
 	private class loadFileProcessor implements CommandActionHandler{
 
 		@Override
@@ -248,38 +273,37 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			if (!diskManager.isMounted()){ 
 				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
 				return resultsList;
-			}//The file must exist
-			if (!diskManager.fileExistsInDirectory(fileToBeRead)){ 
-				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
+			}
+			//The file must exist
+			if (!(new File(fileToBeRead).exists())){ 
+				resultsList.add("\n No such file in directory: "+fileToBeRead+"! \n");
 				return resultsList;
-			}//there must be space for the file.
-			int fileToBeReadIndex = diskManager.findInDirectory(fileToBeRead);
-			if (!diskManager.isAvailableSpace(fileToBeReadIndex)){
+			}
+			//there must be space for the file.
+			if (!diskManager.checkForSpace(fileToBeRead)){
 				resultsList.add("\n There is no more space left in disk! \n");
-			}//overwrite file
+			}
+			//overwrite file
 			else if (diskManager.fileExistsInDirectory(fileToBeOverwritten)){
-				if(diskManager.loadFile(fileToBeRead, fileToBeOverwritten)==1){
-					resultsList.add("\n No available space for overwrite. \n");
-				}else{
-					resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
-				}
-			}else{//create file
-				if(diskManager.duplicateFile(fileToBeRead, fileToBeOverwritten)==1){
-					resultsList.add("\n No available space for overwrite. \n");
-				}else{
-					resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
-				}
+				resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+			}
+			//create file
+			else{
+				resultsList.add("\n No such file name: "+fileToBeOverwritten+"! File has been created instead. \n");
 			}
 			return resultsList;
 		}
-
 	}
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+/**
+ * Creates a processor that handles the creation of a dummy file within the directory.
+ * @author Moises
+ *
+ */
 	private class CreateFileProcessor implements CommandActionHandler{
 
 		public ArrayList<String> execute(Command c) {
@@ -290,22 +314,28 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			//there must be a disk unit mounted.
 			if (!diskManager.isMounted()){ 
 				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
-				return resultsList;
+			}else if(!diskManager.hasAvailableINodes()){
+				resultsList.add("\n No more space in directory! \n");
+			}else{
+				diskManager.testFiles(fileName,fileSize);
+				resultsList.add("\n File created! \n");
 			}
-			diskManager.testFiles(fileName,fileSize);
-			resultsList.add("\n File created! \n");
 			return resultsList;
 		}
 
 	}
 
 
-	
-	
-	
-	
 
 
+
+
+
+/**
+ * Creates a processor for handling the copy of an internal file.
+ * @author Moises
+ *
+ */
 	private class cpProcessor implements CommandActionHandler{
 
 		@Override
@@ -319,24 +349,32 @@ public class SystemCommandsProcessor extends CommandProcessor {
 				resultsList.add("\n No disk is currently mounted, no file could be found. \n");
 				return resultsList;
 			}//The file must exist
+			
 			if (!diskManager.fileExistsInDirectory(fileToBeRead)){ 
 				resultsList.add("\n No such file name: "+fileToBeRead+"! \n");
+				
 			}else if (diskManager.isDirectory(fileToBeRead)){
 				resultsList.add("\n File is not a data file! \n");
 			}
+			
 			else if (!diskManager.fileExistsInDirectory(fileToBeOverwritten)){
 				resultsList.add("\n "+fileToBeRead+" does not exist! \n");
+				
+			}else if(!diskManager.checkForSpace(fileToBeRead)){
+				resultsList.add("\n There is no space in current directory! \n");
 			}else{
-				if(diskManager.loadFile(fileToBeRead, fileToBeOverwritten)==1){
-					resultsList.add("\n No available space for overwrite. \n");
-				}else{
-					resultsList.add("\n "+fileToBeRead+" has been overwritten! \n");
+				diskManager.duplicateFile(fileToBeRead, fileToBeOverwritten);
+				resultsList.add("\n File has been copied! \n");
 				}
-			}
 			return resultsList;
 		}
 	}
-
+	
+/**
+ * Creates a processor for handling the printing of all files within directory.
+ * @author Moises
+ *
+ */
 	private class lsProcessor implements CommandActionHandler{
 		public ArrayList<String> execute(Command c) {
 			resultsList = new ArrayList<>();
@@ -353,7 +391,11 @@ public class SystemCommandsProcessor extends CommandProcessor {
 			return resultsList;
 		}
 	}
-
+/**
+ * Creates a processor that handles the reading of an internal file.
+ * @author Moises
+ *
+ */
 	private class catProcessor implements CommandActionHandler{
 
 		public ArrayList<String> execute(Command c) {//check if exists in directory, check if is data or directory
@@ -380,22 +422,6 @@ public class SystemCommandsProcessor extends CommandProcessor {
 		}
 
 	}
-
-
-
-
-	// INNER CLASSES -- ONE FOR EACH VALID COMMAND --
-	/**
-	 *  The following are inner classes. Notice that there is one such class
-	 *  for each command. The idea is that enclose the implementation of each
-	 *  command in a particular unique place. Notice that, for each command, 
-	 *  what you need is to implement the internal method "execute(Command c)".
-	 *  In each particular case, your implementation assumes that the command
-	 *  received as parameter is of the type corresponding to the particular
-	 *  inner class. For example, the command received by the "execute(...)" 
-	 *  method inside the "LoginProcessor" class must be a "login" command. 
-	 *
-	 */
 
 
 	private class ShutDownProcessor implements CommandActionHandler { 

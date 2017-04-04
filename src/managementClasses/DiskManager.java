@@ -1,6 +1,9 @@
 package managementClasses;
 
 import java.awt.geom.Point2D;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
 import diskUtilities.DiskUnit;
@@ -46,14 +49,17 @@ public class DiskManager {
 
 		//test size for root file in directory
 		//creates a root of size blockSize, sets the file's size to how many blocks it actually takes up.
+		
 		int directoryIndex = prepareFreeBlocksForUse(blockSize);
 		int rootSize = ((int)Math.ceil((double)blockSize/((double)blockSize-4.0)))*blockSize;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-		vdb.setElement(0, (byte)0); //hardcoding in since getINode throws index out of bounds at 0.
+		vdb.setElement(0, (byte)0); 
 		DiskUtils.copyIntToBlock(vdb, 1, rootSize);
 		DiskUtils.copyIntToBlock(vdb, 5, directoryIndex);
-		currentDirectory=new INode((byte)0,rootSize,directoryIndex); //create root file's INode.
+		currentDirectory=new INode((byte)0,DiskUtils.getIntFromBlock(vdb, 1),DiskUtils.getIntFromBlock(vdb, 5)); //create root file's INode.
 		diskUnit.write(0, vdb);
+		firstFreeINode = blockSize+9;
+		diskUnit.setFirstFreeINode(firstFreeINode);
 		stop();
 	}
 
@@ -98,6 +104,7 @@ public class DiskManager {
 			DiskUtils.copyIntToBlock(vdb, currentIndex, nextINode); //copy first INode of next block onto lastiNode of previous block.
 			diskUnit.write(currentBlock, vdb);
 		}
+		diskUnit.setFirstFreeINode(blockSize+9);
 	}
 
 
@@ -134,33 +141,34 @@ public class DiskManager {
 	 * @param fileName file to find in directory.
 	 * @return Index of file in directory (total bytes). -1 if no file was found.
 	 */
-	public int findInDirectory(String fileName){ 
-		int currentBlock = currentDirectory.getIndex();//start at current directory
+	public int findInDirectory(String fileName){
+		int currentBlock = currentDirectory.getIndex();
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		String emptyChar="";
 		emptyChar+=DiskUtils.getCharFromBlock(vdb, 0);
-		while (currentBlock!=0){ // while still within directory
-			diskUnit.read(currentBlock, vdb); //read current block in directory
-			int counter=0; //counter for total bytes in blocks
-			while(counter<blockSize-4){//there are still files in directory
-				String tempName = ""; //empty string to concat chars.
-				int stringCounter=0; //counter for current string
+		while (currentBlock!=0){
+			diskUnit.read(currentBlock, vdb);
+			int fileCounter=0;
+			while (fileCounter<=blockSize-4){
+				int stringCounter=0;
+				String string="";
 				while(stringCounter<20){
-					if(Character.toString(DiskUtils.getCharFromBlock(vdb, counter)).equals(emptyChar)){
+					if(Character.toString(DiskUtils.getCharFromBlock(vdb, stringCounter+fileCounter)).equals(emptyChar)){
 						break;
 					}
-					tempName = tempName+DiskUtils.getCharFromBlock(vdb, counter+stringCounter);
+					string+=DiskUtils.getCharFromBlock(vdb, stringCounter+fileCounter);
 					stringCounter++;
 				}
-				if (tempName.equals(fileName)){//at file.
-					return ((currentBlock*blockSize)+counter);
+				if(string.equals(fileName)){
+					return (currentBlock*blockSize)+blockSize+fileCounter;
 				}
-				counter+=24;//advance to next file
+				fileCounter+=24;
 			}
-			currentBlock = DiskUtils.getIntFromBlock(vdb, blockSize-4); //get next block in file by reading end of block's int
+			currentBlock = DiskUtils.getIntFromBlock(vdb, blockSize-4);
 		}
-		return -1;//file does not exist
+		return -1;
 	}
+
 	/**
 	 * Finds a file in current disk directory, deletes name, iNode, and file associated to iNode.
 	 * @param fileName file to find in directory.
@@ -181,7 +189,7 @@ public class DiskManager {
 		}
 		reclaimFreeBlocks(getINodeAtIndex(indexOfINode).getIndex());//Searches for iNode, gets the position of its file outside of directory, reclaims blocks used.
 		reclaimINode(indexOfINode);//adds file as available file
-		return fileIndex+24;//return former position of file for rewritting
+		return fileIndex;//return former position of file for rewritting
 	}
 
 	/**
@@ -215,45 +223,76 @@ public class DiskManager {
 	 * Takes a file, verifies if there is space in disk and directory to overwrite a second file, and overwrites it.
 	 * @param fileToRead file to be copied.
 	 * @param fileToOverwrite file replaced by copy
-	 * @return 0 if successful, 1 if unsuccessful.
 	 */
-	public int loadFile(String fileToRead,String fileToOverwrite){
-		INode ntc = getINodeAtIndex(findInDirectory(fileToRead)+20); //gets iNode of file being read within directory
-		if(!isAvailableSpace(findInDirectory(fileToRead))){
-			return 1;
-		}
-		int fileToOverwriteIndex = findInDirectory(fileToOverwrite);
-		deleteFileInDirectory(fileToOverwrite);//reclaim space used by file that is being overwritten; name is deleted,
+	public void loadFile(String fileToRead,String fileToOverwrite){
+		int fileToOverwriteIndex=deleteFileInDirectory(fileToOverwrite);//reclaim space used by file that is being overwritten; name is deleted,
+		RandomAccessFile raf;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-		Point2D position = getPosition(fileToOverwriteIndex);
-		diskUnit.read((int)position.getX(), vdb);
-		for(int x=0; x<fileToOverwrite.length();x++){//rewrites name onto block.
-			DiskUtils.copyCharToBlock(vdb, x+(int)position.getY(), fileToOverwrite.charAt(x));
-		}
-		ntc.setIndex(copyFileContents(fileToRead));//leave iNode as is, since most of the information is the same, but set new index to the recently created copy.
-		setINodeAtIndex(fileToOverwriteIndex+20,ntc);//place copied file's iNode to the overwritten file's iNode location.
-		return 0;
+		try {
+			raf = new RandomAccessFile(fileToRead,"rw");
+			INode nta = new INode((byte)1,(int)raf.length(),prepareFreeBlocksForUse((int)raf.length()));
+			int blockPos = (int)getPosition(fileToOverwriteIndex).getX();
+			int blockIndex = (int)getPosition(fileToOverwriteIndex).getY();
+			diskUnit.read(blockPos, vdb);
+			for(int x=0; x<fileToOverwrite.length();x++){
+				DiskUtils.copyCharToBlock(vdb, x+blockIndex, fileToOverwrite.charAt(x));
+			}
+			DiskUtils.copyIntToBlock(vdb, blockIndex+20, addINode(nta));
+			diskUnit.write(blockPos,vdb);
+			int fileIndex = nta.getIndex();
+			while(fileIndex!=0){
+				diskUnit.read(fileIndex, vdb);
+				for(int x=0;x<blockSize-4;x++){
+					if(raf.getFilePointer()>=raf.length()){
+						break;
+					}
+					vdb.setElement(x, raf.readByte());
+				}
+				if(raf.getFilePointer()>=raf.length()){
+					break;
+				}
+				fileIndex = DiskUtils.getIntFromBlock(vdb, blockSize-4);
+			}
+			raf.close();
+		}catch (Exception e) {e.printStackTrace();}
 	}
 	/**
 	 * Takes a file, verifies if there is space in disk and directory to create a second file with a new name, then creates it.
 	 * @param fileToRead file to be copied.
 	 * @param fileToOverwrite file replaced by copy
-	 * @return 0 if successful, 1 if unsuccessful.
 	 */
-	public int duplicateFile(String fileToRead, String fileToOverwrite){//copies file onto a new file with a new name; creating a new file.
-		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
-		int index = getAvailableFileSpaceInDirectory(); //find space within directory
-		if (!isAvailableSpace(findInDirectory(fileToRead))){
-			return 1;
-		}
-		diskUnit.read((index/blockSize),vdb);
-		for(int x=0; x<fileToOverwrite.length();x++){
-			DiskUtils.copyCharToBlock(vdb,(index%blockSize)+x, fileToOverwrite.charAt(x));
-		}
-		DiskUtils.copyIntToBlock(vdb, (index%blockSize)+20, copyFileContents(fileToRead));
-		diskUnit.write(index, vdb);
-		return 0;
+	public void duplicateFile(String fileToRead, String fileToOverwrite){//copies file onto a new file with a new name; creating a new file.
+		try{
+			RandomAccessFile raf = new RandomAccessFile(fileToRead,"rw");
+			int fileIndex = prepareFreeBlocksForUse((int)raf.length());
+			int iNodeIndex = addINode(new INode((byte)0,(int)raf.length(),fileIndex));
+			int directoryIndex = getAvailableFileSpaceInDirectory();
+			int blockPos = (int)getPosition(directoryIndex).getX();
+			int index = (int)getPosition(directoryIndex).getY();
+			VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+			diskUnit.read(blockPos, vdb);
+			for(int x=0; x<fileToRead.length();x++){
+				DiskUtils.copyCharToBlock(vdb, x+index, fileToRead.charAt(x));
+			}
+			DiskUtils.copyIntToBlock(vdb, index+20, iNodeIndex);
+			diskUnit.write(blockPos, vdb);
+			while(fileIndex!=0){
+				diskUnit.read(fileIndex, vdb);
+				for(int x=0;x<blockSize-4;x++){
+					if(raf.getFilePointer()>=raf.length()){
+						break;
+					}
+					vdb.setElement(x, raf.readByte());
+				}
+				if(raf.getFilePointer()>=raf.length()){
+					break;
+				}
+				fileIndex = DiskUtils.getIntFromBlock(vdb, blockSize-4);
+			}
+			raf.close();
+		}catch(Exception e){}
 	}
+
 	/**
 	 * Takes a file and verifies if there is space to make a copy of it by comparing free blocks required to
 	 * recreate it and available iNodes.
@@ -270,28 +309,7 @@ public class DiskManager {
 		}
 		return false;
 	}
-	/**
-	 * Verifies if the file exists in current directory.
-	 * @param fileName file to verify
-	 * @return True if file exists, false otherwise.
-	 */
-	public boolean fileExistsInDirectory(String fileName){
-		return findInDirectory(fileName)!=-1;
-	}
-	/**
-	 * Looks for next free 24 bytes in directory for a new file and iNode location.
-	 * @return Index of free space in directory, -1 if no space was found.
-	 */
-	public int getAvailableFileSpaceInDirectory(){
-		return findInDirectory("");
-	}
-	/**
-	 * Lists all files along with their sizes in this directory.
-	 * @return List of files in current directory
-	 */
-	public ArrayList<String> listFiles(){
-		return listFilesAtINode(currentDirectory);
-	}
+	
 	/**
 	 * Lists all files along with their sizes in an indicated directory.
 	 * @param iNode Directory iNode to list files.
@@ -317,7 +335,8 @@ public class DiskManager {
 					stringCounter++;
 				}
 				if (!(tempName.equals(""))){//at file.
-					files.add(tempName+" - size: "+getINodeAtIndex((currentBlock*blockSize)+counter+20).getSize()+" bytes");
+					INode theINode=getINodeAtIndex(DiskUtils.getIntFromBlock(vdb, counter+20));
+					files.add(tempName+" - size: "+theINode.getSize()+" bytes");
 				}
 				counter+=24;//advance to next file
 			}
@@ -333,25 +352,59 @@ public class DiskManager {
 	public boolean isDirectory(String fileToBeRead) {
 		return getINodeAtIndex(findInDirectory(fileToBeRead)+20).getType()==1;
 	}
-
+	/**
+	 * Verifies if the file exists in current directory.
+	 * @param fileName file to verify
+	 * @return True if file exists, false otherwise.
+	 */
+	public boolean fileExistsInDirectory(String fileName){
+		return findInDirectory(fileName)!=-1;
+	}
+	/**
+	 * Looks for next free 24 bytes in directory for a new file and iNode location.
+	 * @return Index of free space in directory, -1 if no space was found.
+	 */
+	public int getAvailableFileSpaceInDirectory(){
+		return findInDirectory("");
+	}
+	/**
+	 * Lists all files along with their sizes in this directory.
+	 * @return List of files in current directory
+	 */
+	public ArrayList<String> listFiles(){
+		return listFilesAtINode(currentDirectory);
+	}
 	/**
 	 * Reads a data file.
 	 * @param fileName file to read.
 	 * @return Array of file's data.
 	 */
 	public ArrayList<String> readDataFile(String fileName) {
-
-		return null;
+		ArrayList<String> data = new ArrayList<>();
+		int fileIndex = (int) getPosition(findInDirectory(fileName)).getX();
+		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
+		while(fileIndex!=0){
+			diskUnit.read(fileIndex, vdb);
+			String content="";
+			for(int x=0;x<blockSize-4;x++){
+				content+=DiskUtils.getCharFromBlock(vdb, x);
+				}
+			data.add(content);
+			fileIndex = DiskUtils.getIntFromBlock(vdb, blockSize-4);
+		}
+		return data;
 	}
-
 	/**
 	 * creates a dummy file for testing file methods.
 	 * @param fileSize size of file
 	 * @param fileName name of file
 	 */
-	public void testFiles(String fileName, int fileSize){
+	public void testFiles(String fileName, int fileSize) throws FullDiskException{
 		int fileIndex = prepareFreeBlocksForUse(fileSize);
 		int iNodeIndex = addINode(new INode((byte)0,fileSize,fileIndex));
+		if (iNodeIndex==0){
+			throw new FullDiskException("Disk is full!");
+		}
 		int directoryIndex = getAvailableFileSpaceInDirectory();
 		int blockPos = (int)getPosition(directoryIndex).getX();
 		int index = (int)getPosition(directoryIndex).getY();
@@ -451,11 +504,16 @@ public class DiskManager {
 	private int totalFreeBlocks() {
 		int counter = 0;
 		int currentFreeBlock = freeBlockIndex;
+		int currentEnd = endOfFreeBlockIndex;
 		VirtualDiskBlock vdb = new VirtualDiskBlock(blockSize);
 		while (currentFreeBlock!=0){
 			diskUnit.read(currentFreeBlock,vdb);
+			while(currentEnd>0){
+				currentEnd-=4;
+				counter++;
+			}
 			currentFreeBlock = DiskUtils.getIntFromBlock(vdb, 0);
-			counter++;
+			currentEnd=blockSize-4;
 		}
 		return counter;
 	}
@@ -531,7 +589,7 @@ public class DiskManager {
 	 * @param nta iNode to add.
 	 * @return node's index
 	 */
-	private int addINode(INode nta) { //Adds iNode to list
+	private int addINode(INode nta) throws FullDiskException { //Adds iNode to list
 		int temp = firstFreeINode;
 		firstFreeINode = getINodeAtIndex(firstFreeINode).getIndex();
 		diskUnit.setFirstFreeINode(firstFreeINode);
@@ -589,4 +647,24 @@ public class DiskManager {
 		mountName=null;
 		currentDirectory=null;
 	}
+	public boolean hasAvailableINodes(){
+		return firstFreeINode!=0;
+	}
+	/**
+	 * Checks if there is space to copy the file on to the directory.
+	 * @param fileName file to verify space
+	 * @return True if there is space, false otherwise.
+	 */
+	public boolean checkForSpace(String fileName) {
+		int fileSize = 0;
+		try {
+			fileSize = (int) new RandomAccessFile(fileName,"rw").length();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return firstFreeINode!=0&&getAvailableFileSpaceInDirectory()!=-1&&(int)Math.ceil(fileSize/blockSize)<=totalFreeBlocks()*blockSize;
+	}
+	
 }
